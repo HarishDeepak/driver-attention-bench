@@ -130,6 +130,8 @@ images (8,492 closed). MediaPipe blink/EAR cannot run on eye crops (they need a 
 CLIP IR probe by condition: bad lighting 0.93 vs good 0.94; glasses 0.88 vs none 0.96; big reflections 0.86 vs none 0.95.
 GPU forward pass: DINOv2-small 1.3 ms, CLIP ViT-B/32 0.7 ms per eye image.
 
+![Infrared eye-state results](../results/infrared_eye_state.png)
+
 **Reading:** a model trained on daylight RGB drops to 0.69-0.76 on infrared: the day-to-night domain gap is real. Trained on IR it
 reaches 0.93-0.94 on people it never saw, and low light barely matters in IR; glasses and strong reflections are the hard cases.
 This is why production DMS cameras are IR and why IR training data matters. Caveats: cropped eyes, not a car DMS camera, single

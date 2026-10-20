@@ -119,6 +119,38 @@ def live_gif(video, frames_csv, labels_csv, path, t0, t1, fps=6, width=600):
     imgs[0].save(path, save_all=True, append_images=imgs[1:], duration=1000 // fps, loop=0, optimize=True)
 
 
+def ir_chart(src, path):
+    """Two panels from out/fm/ir_eye_probe.csv: day-RGB vs IR training, and the IR-trained probe by condition."""
+    r = read(src)
+    ba = lambda m, s="all": float(next(x["bal_acc"] for x in r if x["method"] == m and x["subset"] == s))
+    left = [("CLIP\nzero-shot", ba("(a) CLIP zero-shot"), "#999999"),
+            ("DINOv2\ntrained on\nday RGB", ba("(b) DINOv2-small, DMD-RGB trained"), "#DD8452"),
+            ("CLIP\ntrained on\nday RGB", ba("(b) CLIP ViT-B/32, DMD-RGB trained"), "#DD8452"),
+            ("DINOv2\ntrained on\nIR", ba("(c) DINOv2-small, MRL LOSO"), "#4C72B0"),
+            ("CLIP\ntrained on\nIR", ba("(c) CLIP ViT-B/32, MRL LOSO"), "#4C72B0")]
+    m = "(d) (c) CLIP ViT-B/32, MRL LOSO"
+    right = [(f"{k.split('=')[0]}\n{k.split('=')[1]}", ba(m, k)) for k in
+             ("lighting=good", "lighting=bad", "glasses=no", "glasses=yes", "reflections=none", "reflections=big")]
+    fig, (a, b) = plt.subplots(1, 2, figsize=(10, 3.4), gridspec_kw=dict(width_ratios=[5, 6]))
+    for i, (name, v, c) in enumerate(left):
+        a.bar(i, v, color=c)
+        a.text(i, v + 0.01, f"{v:.2f}", ha="center", fontsize=8)
+    a.set_xticks(range(len(left)), [x[0] for x in left], fontsize=7)
+    a.set_title("Real infrared eyes, people never seen in training", fontsize=9)
+    for i, (name, v) in enumerate(right):
+        b.bar(i, v, color="#4C72B0" if i % 2 == 0 else "#55A868")
+        b.text(i, v + 0.01, f"{v:.2f}", ha="center", fontsize=8)
+    b.set_xticks(range(len(right)), [x[0] for x in right], fontsize=7)
+    b.set_title("IR-trained CLIP probe by condition", fontsize=9)
+    for ax in (a, b):
+        ax.set_ylim(0.4, 1.02)
+        ax.axhline(0.5, color="grey", lw=0.6, ls=":")
+    a.set_ylabel("balanced accuracy (0.5 = guessing)")
+    fig.suptitle("MRL Eye dataset: 16,920 infrared eye images, 37 people, leave-one-person-out", fontsize=9)
+    fig.tight_layout()
+    fig.savefig(path, dpi=130)
+
+
 def main():
     RES.mkdir(exist_ok=True)
     for src, dst in COPY.items():
@@ -129,6 +161,8 @@ def main():
     if live:
         live_escalation(live[-1], RES / "live_escalation.png")
     cosmos_panel(OUT / "cosmos", RES / "carla_control_videos.png")
+    if (OUT / "fm/ir_eye_probe.csv").exists():
+        ir_chart(OUT / "fm/ir_eye_probe.csv", RES / "infrared_eye_state.png")
     live = ROOT / "data/clips/clip05_live.mp4"  # own face, phone camera, voice-guided take, hand-labelled truth (publishable, unlike DMD)
     if live.exists():
         live_gif(live, OUT / "live_runs5/camera__clean_frames.csv", OUT / "live_runs5/labels_hand.csv", RES / "demo_live_phone.gif", 21, 51)
