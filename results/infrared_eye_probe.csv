@@ -1,0 +1,18 @@
+method,subset,n,bal_acc,f1_closed,ms_per_image
+(a) CLIP zero-shot,all,16920,0.549,0.688,
+"(b) DINOv2-small, DMD-RGB trained",all,16920,0.685,0.584,
+"(c) DINOv2-small, MRL LOSO",all,16920,0.934,0.934,
+"(b) CLIP ViT-B/32, DMD-RGB trained",all,16920,0.760,0.765,
+"(c) CLIP ViT-B/32, MRL LOSO",all,16920,0.939,0.940,
+"(d) (c) CLIP ViT-B/32, MRL LOSO",lighting=bad,10670,0.934,0.941,
+"(d) (c) CLIP ViT-B/32, MRL LOSO",lighting=good,6250,0.944,0.937,
+"(d) (c) CLIP ViT-B/32, MRL LOSO",glasses=yes,3901,0.880,0.886,
+"(d) (c) CLIP ViT-B/32, MRL LOSO",glasses=no,13019,0.957,0.957,
+"(d) (c) CLIP ViT-B/32, MRL LOSO",reflections=none,14217,0.948,0.950,
+"(d) (c) CLIP ViT-B/32, MRL LOSO",reflections=small,927,0.943,0.939,
+"(d) (c) CLIP ViT-B/32, MRL LOSO",reflections=big,1776,0.864,0.828,
+"(d) (c) CLIP ViT-B/32, MRL LOSO",sensor=01,14851,0.938,0.943,
+"(d) (c) CLIP ViT-B/32, MRL LOSO",sensor=02,1885,0.913,0.890,
+"(d) (c) CLIP ViT-B/32, MRL LOSO",sensor=03,184,1.000,1.000,
+"(e) forward pass, DINOv2-small","NVIDIA GeForce RTX 4050 Laptop GPU, fp16, batch 64",16920,,,1.34
+"(e) forward pass, CLIP ViT-B/32","NVIDIA GeForce RTX 4050 Laptop GPU, fp16, batch 64",16920,,,0.73

@@ -113,6 +113,28 @@ look-away episode (a long closure stays sleep, not distraction). A first version
 distraction warning during a real eye closure; the bounded version was re-checked on all data: synthetic 15/18 with 0 false
 alerts and DMD identical on every arm. The 0.5 s bound comes from one take.
 
+## E9. Real infrared: MRL Eye (night-time proxy)
+
+DMD no longer publishes IR video (all three DMD sets are RGB-only now), so real IR comes from the MRL Eye Dataset: 84,898 cropped
+infrared eye images, 37 people, three IR sensors, labelled open/closed, lighting good/bad, glasses, reflections. Sampled 16,920
+images (8,492 closed). MediaPipe blink/EAR cannot run on eye crops (they need a whole face), so this tests the eye classifiers only.
+
+| Method | Balanced accuracy | F1 (closed) |
+|---|---|---|
+| CLIP zero-shot | 0.55 | 0.69 |
+| DINOv2 probe trained on DMD daylight RGB -> tested on IR | 0.69 | 0.58 |
+| CLIP probe trained on DMD daylight RGB -> tested on IR | 0.76 | 0.77 |
+| DINOv2 probe trained on IR, tested on unseen people (LOSO) | 0.93 | 0.93 |
+| CLIP probe trained on IR, tested on unseen people (LOSO) | 0.94 | 0.94 |
+
+CLIP IR probe by condition: bad lighting 0.93 vs good 0.94; glasses 0.88 vs none 0.96; big reflections 0.86 vs none 0.95.
+GPU forward pass: DINOv2-small 1.3 ms, CLIP ViT-B/32 0.7 ms per eye image.
+
+**Reading:** a model trained on daylight RGB drops to 0.69-0.76 on infrared: the day-to-night domain gap is real. Trained on IR it
+reaches 0.93-0.94 on people it never saw, and low light barely matters in IR; glasses and strong reflections are the hard cases.
+This is why production DMS cameras are IR and why IR training data matters. Caveats: cropped eyes, not a car DMS camera, single
+frames, subsampled. Details: `details/FOUNDATION.md`.
+
 ## E7. Speed
 
 | Part | Speed |

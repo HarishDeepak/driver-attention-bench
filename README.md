@@ -49,6 +49,8 @@ flowchart LR
 2. **Big AI models did not beat the simple signals.** DINOv2 and CLIP (foundation models) recognised closed eyes about as well as
    the simple eyelid measurement (≈ 97 % per frame). Large chat-style vision models (VLMs) were close to guessing and took
    3-9 seconds per frame. For a warning that must come within 0.2 s, the small fast model is the right tool.
+   On **real infrared** eye images (night-time cameras), an eye model trained on daylight video dropped to 0.69-0.76; trained on
+   infrared it reached 0.93-0.94 on unseen people. Day-to-night is a real gap, which is why car DMS cameras are infrared.
 3. **Driver state changes the crash outcome.** In CARLA, a distracted driver with a standard collision warning crashes at 30 and
    50 km/h. Warning earlier because the camera knows the driver is distracted avoids both crashes.
 

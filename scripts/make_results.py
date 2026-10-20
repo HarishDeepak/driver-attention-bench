@@ -18,7 +18,7 @@ from evaluate import read, wilson  # noqa: E402
 OUT, RES = ROOT / "out", ROOT / "results"
 COPY = {"carla_fcw.csv": "carla_fcw.csv", "carla_fcw.png": "carla_fcw.png", "synthetic/summary.csv": "synthetic_summary.csv",
         "synthetic/report.pdf": "synthetic_report.pdf", "dmd/summary.csv": "dmd_summary.csv", "dmd/arms.csv": "dmd_arms.csv",
-        "fm/eye_probe.csv": "foundation_eye_probe.csv", "vlm/summary.csv": "vlm_summary.csv"}
+        "fm/eye_probe.csv": "foundation_eye_probe.csv", "fm/ir_eye_probe.csv": "infrared_eye_probe.csv", "vlm/summary.csv": "vlm_summary.csv"}
 # DMD measurement steps, default arm: runs in out/dmd_baseline, out/dmd_scope, out/dmd; step 4 = scripts/replay.py on close-only labels
 DMD_STEPS = [("first run", 7, 66, 107), ("+ scoring scope", 7, 62, 18.9), ("+ 20 s calibration", 10, 58, 9.7), ("+ lids-shut labels", 22, 49, 19.4)]
 
