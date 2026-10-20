@@ -62,6 +62,28 @@ def straight_start(m, ahead=STRAIGHT, yaw_tol=3.0):
     raise SystemExit("no straight road found")
 
 
+LEVEL_BGR = {"ok": (0, 200, 0), "warning": (0, 200, 255), "slowing": (0, 128, 255), "mrm": (0, 0, 255), "stopped": (0, 0, 160)}
+
+
+def speed_strip(rows, t_max, w, h=150, v_max=100.0):
+    """Speed-over-time plot of the run so far (rows: [t, closed, away, warned, level, target, speed]), coloured by DMS level."""
+    img = np.full((h, w, 3), 25, np.uint8)
+    x0, x1, y0, y1 = 70, w - 170, 15, h - 25
+    X = lambda t: int(x0 + (x1 - x0) * min(t / t_max, 1))
+    Y = lambda v: int(y1 - (y1 - y0) * min(v / v_max, 1))
+    for v in (0, 50, 100):
+        cv2.line(img, (x0, Y(v)), (x1, Y(v)), (70, 70, 70), 1)
+        cv2.putText(img, f"{v}", (x0 - 40, Y(v) + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (180, 180, 180), 1)
+    cv2.putText(img, "km/h", (5, y0 + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (180, 180, 180), 1)
+    for p, q in zip(rows, rows[1:]):
+        cv2.line(img, (X(p[0]), Y(p[6])), (X(q[0]), Y(q[6])), LEVEL_BGR.get(q[4], (255, 255, 255)), 3)
+    if rows:
+        cv2.putText(img, f"{rows[-1][6]:3.0f} km/h", (x1 + 15, h // 2 + 5), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+        cv2.putText(img, rows[-1][4].upper(), (x1 + 15, h // 2 + 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, LEVEL_BGR.get(rows[-1][4], (255, 255, 255)), 2)
+    cv2.putText(img, f"time (s), 0-{t_max:.0f}", (x0, h - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (180, 180, 180), 1)
+    return img
+
+
 def lane_path(w, length):
     """Locations every 10 m along w's own lane (TM set_path: no random branch at splits)."""
     path = []
@@ -136,6 +158,12 @@ try:
         actors.append(chase)
         q = queue.Queue()
         chase.listen(q.put)
+        # top-down "drone" inset: lane dashes and traffic stream past at speed and stop with the car (a chase camera hides speed)
+        bp.set_attribute("image_size_x", "240"), bp.set_attribute("image_size_y", "240")
+        top = world.spawn_actor(bp, carla.Transform(carla.Location(0, 0, 35), carla.Rotation(pitch=-90)), attach_to=ego)
+        actors.append(top)
+        q2 = queue.Queue()
+        top.listen(q2.put)
     world.tick()
 
     mon, esc = Monitor(), Escalation(CRUISE)
@@ -188,7 +216,11 @@ try:
             col = {"ok": (0, 200, 0), "warning": (0, 200, 255), "slowing": (0, 128, 255)}.get(level, (0, 0, 255))
             for i, line in enumerate(txt):
                 cv2.putText(left, line, (8, 25 + 26 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.55, col if i == 1 else (255, 255, 255), 2)
-            view = np.hstack([left, cam])
+            tim = q2.get(timeout=10)
+            pip = cv2.resize(np.frombuffer(tim.raw_data, np.uint8).reshape(tim.height, tim.width, 4)[:, :, :3], (190, 190))
+            cam[8:198, -198:-8] = pip
+            cv2.rectangle(cam, (cam.shape[1] - 199, 7), (cam.shape[1] - 7, 199), (255, 255, 255), 1)
+            view = np.vstack([np.hstack([left, cam]), speed_strip(rows, a.seconds, 480 + cam.shape[1])])
             if a.video:  # one frame per sim tick -> the file plays at sim time (20 fps)
                 vw = vw or cv2.VideoWriter(a.video, cv2.VideoWriter_fourcc(*"mp4v"), 1 / DT, (view.shape[1], view.shape[0]))
                 vw.write(view)
