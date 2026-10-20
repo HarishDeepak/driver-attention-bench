@@ -1,0 +1,6 @@
+# Synthetic arm: Blender + MPFB2 clips (tools/blender/render_all.sh) with exact labels -> same pipeline as suite.toml
+clips_dir = "data/synthetic"
+labels = "data/synthetic/labels.csv"
+out = "out/synthetic"
+variants = ["clean"]
+clahe = [false]
