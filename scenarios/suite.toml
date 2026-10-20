@@ -1,0 +1,6 @@
+# Test suite: every clip x every variant (x clahe on/off) -> run_clip.py -> evaluate.py -> report.py
+clips_dir = "data/clips"
+labels = "data/clips/labels.csv"
+out = "out"
+variants = ["clean", "ir", "glare", "dark", "sunglasses", "mask", "fps25"]
+clahe = [false, true]  # false = plain run, true = also run with --clahe
