@@ -49,7 +49,7 @@ Eyes close → sleep warning → DMS level WARNING in the car. The driver looks 
   <img src="results/demo_carla_safe_stop.gif" width="420" alt="CARLA: slowing, minimal-risk manoeuvre, lane change right, stop at the lane edge">
   <img src="results/live_escalation.png" width="440" alt="CARLA ego speed during escalation">
 </p>
-<p align="center"><sub>If the driver stays asleep (simulated driver, eyes closed from 2 s): warning 3.5 s, slowing to 60 km/h from 10 s,
+<p align="center"><sub>If the driver stays asleep (simulated driver, eyes closed from 2 s): warning 3.5 s, slowing to 60 km/h from 10 s (8 s after the eyes closed),
 minimal-risk manoeuvre from 15 s (hazards on, CARLA's planner checks the right lane is free, moves one lane right, brakes at
 2 m/s² to the lane's right edge), standstill at 23.2 s.</sub></p>
 <p align="center"><a href="results/videos/carla_minimal_risk_manoeuvre.mp4?raw=true">⬇ full run, 35 s (MP4 download)</a> · GIF above is a short excerpt</p>
@@ -58,7 +58,7 @@ minimal-risk manoeuvre from 15 s (hazards on, CARLA's planner checks the right l
 
 1. **Most of the early "failures" were test-setup mistakes, not detector mistakes.** On real drivers the first run caught only
    7 of 66 events in time. Scoring only where the dataset has labels, calibrating over 20 s instead of 2 s, and defining
-   "closed" as lids actually shut raised that to 30 of 49, without changing the detector.
+   "closed" as lids actually shut raised that to 22 of 49 with the same blink-score detector (30 of 49 with the EAR signal).
 2. **Big AI models did not beat the simple signals.** DINOv2 and CLIP (foundation models) recognised closed eyes about as well as
    the simple eyelid measurement (≈ 97 % per frame). Large chat-style vision models (VLMs) were close to guessing and took
    3-9 seconds per frame. For a warning that must come within 0.2 s, the small fast model is the right tool.
@@ -76,7 +76,7 @@ minimal-risk manoeuvre from 15 s (hazards on, CARLA's planner checks the right l
 3. **Driver state changes the crash outcome, and detector accuracy decides by how much.** In CARLA, a distracted driver with a
    standard collision warning crashes at 30 and 50 km/h; warning earlier because the camera flags the distraction avoids both.
    A Monte Carlo over driver reaction times then plugs in the accuracy measured on real drivers: at 50 km/h the crash rate falls
-   from 87 % (no DMS) to 44 % (our measured DMS) and 17 % (ideal DMS). Reaction times are an assumption; the chain is the point.
+   from 87 % (no DMS) to 44 % (measured DMS: EAR, lids-shut labels, 61 % caught) and 17 % (ideal DMS). Reaction times are an assumption; the chain is the point.
 
 <p align="center">
   <img src="results/dmd_steps.png" width="49%" alt="DMD hit rate per measurement fix">
@@ -86,7 +86,7 @@ minimal-risk manoeuvre from 15 s (hazards on, CARLA's planner checks the right l
   <img src="results/dms_safety_mc.png" width="90%" alt="Crash probability vs speed for no DMS, measured DMS and ideal DMS">
 </p>
 
-Personal project: small datasets, simplified car physics, no product claims.
+Personal project by Harish Deepak (TU Darmstadt), October 2026: small datasets, simplified car physics, no product claims.
 
 Every number, including what did not work: [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md). How each warning is scored: [`docs/METHOD.md`](docs/METHOD.md).
 
@@ -124,7 +124,7 @@ Methods are organised in tiers, the way production DMS work splits them; every t
 
 | Tier | Runs where | Methods | Role here |
 |---|---|---|---|
-| 1. Real time | CPU, 25+ fps | MediaPipe blink score / EAR, head pose, MobileGaze CNN | warnings, escalation, CARLA |
+| 1. Real time | CPU, 25+ fps | MediaPipe blink score / EAR, head pose (MobileGaze CNN: 12-17 fps, below 25) | warnings, escalation, CARLA |
 | 2. Stronger perception | GPU, ~4 ms/frame | DINOv2 / CLIP features + linear probe | does a foundation backbone help? |
 | 3. Offline / cloud | seconds per frame | hosted VLMs (Llama 3.2 Vision, Nemotron VL) | auto-labelling, event review |
 | 4. Data generation | offline | Blender drivers, image variants, CARLA, Cosmos control videos | test cases you cannot record safely |
@@ -172,12 +172,16 @@ driver-attention-bench/
 ├── scripts/                entry points
 │   ├── run_clip.py         one video / camera → per-frame CSV + warnings
 │   ├── replay.py           re-run the decision step on saved signals (threshold sweeps, LOSO)
-│   ├── render_overlay.py   burn decisions, truth and warnings into a video   cues_to_labels.py  voice-cue log → labels
+│   ├── render_overlay.py   burn decisions, truth and warnings into a video
+│   ├── cues_to_labels.py   voice-cue log → labels (no detections used)
 │   ├── dmd_to_labels.py    DMD OpenLABEL → events + scoring scope
-│   ├── carla_fcw.py        collision-warning sweep      dms_safety_mc.py  DMS accuracy → crash Monte Carlo
+│   ├── carla_fcw.py        collision-warning sweep
+│   ├── dms_safety_mc.py    DMS accuracy → crash-probability Monte Carlo
 │   ├── live_demo.py        DMS → escalation → CARLA (traffic, minimal-risk manoeuvre via CARLA BasicAgent, --video)
 │   ├── ros2/               dms_state_pub.py (rclpy), record.sh (rosbag2)
-│   ├── fm_eye_probe.py     DINOv2 / CLIP probes (DMD)   ir_eye_probe.py  infrared (MRL Eye)   vlm_arm.py  hosted VLMs
+│   ├── fm_eye_probe.py     DINOv2 / CLIP probes (DMD)
+│   ├── ir_eye_probe.py     infrared eye images (MRL Eye)
+│   ├── vlm_arm.py          hosted vision-language models
 │   ├── cosmos_transfer.py  Cosmos Transfer request (prepared, endpoint unavailable on free tier)
 │   └── make_results.py     builds results/ from out/
 ├── scenarios/*.toml        test suites: clips × variants × settings
@@ -207,14 +211,18 @@ python scripts/live_demo.py sim:2-40 --headless --video out.mp4   # simulated dr
 bash scripts/ros2/record.sh
 ```
 
-**Setup.** Python 3.12: `mediapipe opencv-python onnxruntime carla matplotlib` (+ `torch transformers scikit-learn` for the
-foundation-model arms, `shapely networkx` for CARLA's navigation agents used in the minimal-risk manoeuvre). Models go in `models/`, not in git:
+**Setup.** Python 3.12: `pip install -r requirements.txt` (`mediapipe opencv-python onnxruntime carla matplotlib` (+ `torch transformers scikit-learn` for the
+foundation-model arms, `shapely networkx` for CARLA's navigation agents used in the minimal-risk manoeuvre)). Models go in `models/`, not in git:
 - `face_landmarker.task`: https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
 - `yunet.onnx` (optional face fallback): `face_detection_yunet_2023mar.onnx` from opencv_zoo
 - `mobileone_s0_gaze.onnx` (optional `--gaze mobilegaze` arm): MobileGaze MobileOne-S0 export, MIT licence
 
 DMD is not redistributed (CC BY-NC-ND): request it from Vicomtech, then `python scripts/dmd_to_labels.py`.
 Optional parts (ROS 2, Blender, Cosmos): [`docs/details/`](docs/details/).
+
+## Licence
+
+Code: MIT (see `LICENSE`). Data and models are third-party and keep their own terms: DMD (Vicomtech, CC BY-NC-ND 4.0) is not redistributed; the NITYMED clips shown are CC BY 4.0 (Petrellis et al.); MediaPipe, MobileGaze, DINOv2 and CLIP models are downloaded from their sources.
 
 ## Limitations
 

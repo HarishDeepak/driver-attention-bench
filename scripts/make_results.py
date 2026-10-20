@@ -198,9 +198,9 @@ def main():
         if (OUT / src).exists():
             shutil.copy(OUT / src, RES / dst)
     dmd_steps(RES / "dmd_steps.png")
-    live = sorted(OUT.glob("live_*.csv"))
-    if live:
-        live_escalation(live[-1], RES / "live_escalation.png")
+    esc_csv = OUT / "live_20261020_230149.csv"  # the simulated sleeping driver run shown in carla_escalation_sim.mp4 (not simply the latest run)
+    if esc_csv.exists():
+        live_escalation(esc_csv, RES / "live_escalation.png")
     cosmos_panel(OUT / "cosmos", RES / "carla_control_videos.png")
     sbs = OUT / "videos/carla_real_face_take5.mp4"  # take 5 (own face) driving the CARLA ego: live_demo.py <clip> --video
     if sbs.exists():

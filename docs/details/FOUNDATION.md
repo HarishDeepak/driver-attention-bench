@@ -37,7 +37,7 @@ CPU time of the landmarker call per frame; it was measured while the MediaPipe b
 ## Caveats (read these before quoting numbers)
 
 - **Frame-level, not event-level.** We score single frames. We do not measure alert timing, PERCLOS or the SD-202 rules. The
-  event-level results are in `README.md` and `docs/LEARN.md`.
+  event-level results are in `README.md` and `docs/EXPERIMENTS.md`.
 - **Easy frames only.** Blink/transition frames are dropped, so the task is easier than real drowsiness detection.
 - **Few subjects.** Six people and 870 closed frames. A difference of 0.01 in balanced accuracy means nothing here.
 - **Thresholds are learned on training subjects only.** For (a) and (b) the cut-off is the one that maximises balanced accuracy on the
@@ -49,7 +49,7 @@ CPU time of the landmarker call per frame; it was measured while the MediaPipe b
 
 ## Speed against the 25 Hz requirement
 
-Euro NCAP SD-202 asks for at least 25 frames per second [see HANDOFF.md, "Verified facts"]. That is 40 ms per frame for everything.
+Euro NCAP SD-202 asks for at least 25 frames per second (SD-202 v1.2). That is 40 ms per frame for everything.
 - The DINOv2 and CLIP forward passes take about 4 ms per frame on this GPU. They fit the budget.
 - The face-finding pass (MediaPipe) took about 47 ms per frame on CPU in this run, under load. That alone is over 40 ms.
 - A foundation model does not replace the detector: it needs the eye crops from the detector. So on this hardware the detector

@@ -60,5 +60,5 @@ to the rightmost lane if free, stop at its edge) -> stopped, no move-off. 2 s at
 |---|---|---|
 | DMD (Vicomtech) | 13 face videos, 6 drivers, per-frame eye-state and gaze-zone labels | CC BY-NC-ND, academic use; kept local, never uploaded |
 | Blender + MPFB2 | 6 synthetic driver clips with exact labels (`details/SYNTHETIC.md`) | covers sunglasses / mask safely |
-| Own phone clips | protocol in `details/RECORDING.md` | not recorded yet; never while driving |
+| Own phone clips | voice-guided takes, hand-labelled (E8); protocol in `details/RECORDING.md` | never while driving |
 | CARLA 0.9.16 | road scenes for the vehicle side | no in-cabin camera in CARLA |

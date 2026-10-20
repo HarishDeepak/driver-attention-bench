@@ -77,7 +77,7 @@ Free NVIDIA build.nvidia.com API, zero-shot, 142 frames. DMD is never sent (lice
 | Nemotron VL 120B (reasoning) | 0.59 | 0.63 | 8.6 (29 of 142 unparseable answers) |
 
 For comparison, the real-time pipeline scores ~0.97 per frame on eye state (E4) at ~30 ms. Zero-shot VLMs are near chance on
-eyelids and 100-300x too slow for a 25 Hz warning; their use is offline (labelling help, describing an event afterwards).
+eyelids and about 90-290x too slow for a 25 Hz warning; their use is offline (labelling help, describing an event afterwards).
 Caveat: 142 frames, synthetic faces, closures behind sunglasses count as "closed" in the labels.
 
 Listed but not callable on the free tier (HTTP 404 "Function not found for account"): Cosmos Reason 2, Gemma 3, VILA, Phi-3 Vision.
@@ -95,7 +95,18 @@ Listed but not callable on the free tier (HTTP 404 "Function not found for accou
 At 80 km/h a 2 s warning is too late even for an attentive driver: the sweep shows the limit of warning-only systems.
 
 **Live escalation** (`scripts/live_demo.py`, simulated driver, eyes closed from 2 s): warning 3.5 s, slowing 10 s, minimal-risk stop 15 s,
-standstill 22.5 s (`results/live_escalation.png`). The DMS state is also published as ROS 2 topic `/dms/state` and recorded to a rosbag (`details/ROS2.md`).
+standstill 23.2 s after the MRM fix in E10 (`results/live_escalation.png`). The DMS state is also published as ROS 2 topic `/dms/state` and recorded to a rosbag (`details/ROS2.md`).
+
+## E7. Speed
+
+| Part | Speed |
+|---|---|
+| default pipeline (MediaPipe, CPU) | ~35 fps Windows / ~58 fps WSL |
+| MediaPipe Face Landmarker alone, WSL, CPU (XNNPACK) vs GPU delegate | CPU 86 fps; GPU via OpenGL ES → Mesa D3D12 → RTX 4050: 6.4 fps (translation layers + frame copies dwarf a tiny model); software OpenGL: fails |
+| with MobileGaze | ~12-17 fps (below the 25 Hz SD-202 video rate) |
+| DINOv2 / CLIP on two eye crops (GPU) | 3.5-4.5 ms per frame |
+| hosted VLM | seconds per frame: offline use only |
+
 
 ## E8. Live phone camera (own face, voice-guided takes)
 
@@ -146,7 +157,7 @@ Two fixes made on the way: video frames (30 fps) now all feed the DMS while the 
 tick per frame ran the car 1.5x slow); the Traffic Manager is pinned to the start lane (`tm.set_path`), because a replay showed the
 minimal-risk stop ending at a highway-exit gore instead of in lane. The scene now loads props, street lights, buildings and foliage on top of the ground layer (fits the 6 GB GPU, ~2.7 GB) and adds six Traffic-Manager cars in the neighbouring lanes, so the slow-down and the stop in lane are visible against traffic.
 
-**Minimal-risk manoeuvre, done like the regulation and CARLA's own planner.** UN R157 (automated lane keeping) requires the MRM to
+**Minimal-risk manoeuvre, done like the regulation and CARLA's own planner.** UN R157 (automated lane keeping, https://unece.org/sites/default/files/2023-12/R157e.pdf) requires the MRM to
 slow the car "inside the lane" at ≤ 4 m/s², hazard lights from its start, standstill, and no move-off without manual input. On top,
 as some production systems do, the car now moves to the slower lane first when that is safe: at the MRM start CARLA's reference
 `BasicAgent` (LocalPlanner + PID) takes over from the Traffic Manager; each tick it checks, exactly like CARLA's `BehaviorAgent`,
@@ -185,7 +196,7 @@ Fix: **robust calibration**. "Eyes open" = the most-open 20 % of the calibration
 plausible open values. Truth: two night videos hand-labelled at 0.5 s steps without the system's output (25 microsleeps, 27
 expected warnings). Hand labels are ±0.3 s, so a hit here = warning between the required moment -0.5 s and the event end +0.5 s.
 
-| Method | Night: hits / false alerts | DMD (lids shut, ±0.2 s) | Synthetic | Own take 5 |
+| Method | Night: hits / false alerts (count) | DMD (lids shut, ±0.2 s) | Synthetic | Own take 5 |
 |---|---|---|---|---|
 | Blink, median calibration (old default) | 7/27, 0 | 22/49, 8 | 15/18, 0 | 4/4, 0 |
 | Blink, robust calibration (new default) | 10/27, 0 | 22/49, 8 | 15/18, 0 | 4/4, 0 |
@@ -196,8 +207,7 @@ expected warnings). Hand labels are ±0.3 s, so a hit here = warning between the
 Reading: robust calibration costs nothing on any other dataset and helps at night, so it is now the default. A well-chosen fixed
 threshold is a real alternative: EAR fixed at 0.15 gives 31/49 on DMD (17 false alerts) vs 30/49 (14) calibrated, and the
 leave-one-driver-out choice still prefers calibration for its fewer false alerts; a fixed blink threshold helps at night but adds
-false alerts in daylight and on the phone take. (An earlier draft said a fixed EAR threshold "collapses" on DMD: that came from
-applying blink-scale thresholds to EAR and was wrong.) No single eye signal wins everywhere: EAR is better on DMD and at night, the blink score on the daytime phone
+false alerts in daylight and on the phone take. No single eye signal wins everywhere: EAR is better on DMD and at night, the blink score on the daytime phone
 take. Default stays blink score; EAR (`--eye ear`) is the recommended setting for night and real-car footage.
 
 **Same flaw, gaze side** (found by watching the night overlay): the clip showed "looking away" whenever the driver's eyes were open.
@@ -207,16 +217,6 @@ head and eye-direction baseline only from calibration frames whose eyes are open
 disappeared (only microsleep/sleep remain); re-checked on all labelled data with no change (take 5: 4/4; synthetic: 15/18;
 DMD: identical on every arm, including the gaze clips).
 
-## E7. Speed
-
-| Part | Speed |
-|---|---|
-| default pipeline (MediaPipe, CPU) | ~35 fps Windows / ~58 fps WSL |
-| MediaPipe Face Landmarker alone, WSL, CPU (XNNPACK) vs GPU delegate | CPU 86 fps; GPU via OpenGL ES → Mesa D3D12 → RTX 4050: 6.4 fps (translation layers + frame copies dwarf a tiny model); software OpenGL: fails |
-| with MobileGaze | ~12-17 fps (below the 25 Hz SD-202 video rate) |
-| DINOv2 / CLIP on two eye crops (GPU) | 3.5-4.5 ms per frame |
-| hosted VLM | seconds per frame: offline use only |
-
 ## Considered, not done
 
 | Idea | Why not |
@@ -225,4 +225,4 @@ DMD: identical on every arm, including the gaze clips).
 | SAM 3 / Grounding DINO in the live loop | gives masks / boxes, not eyelid state, and too slow on 6 GB. Fits occupant monitoring (phone, child seat) or offline labelling. |
 | Small temporal model (GRU) on per-frame signals | per-frame accuracy is already ~97 %; the misses come from label timing, which a model trained on the same labels would copy. |
 | Paid cloud GPUs | project rule: free tier only. Kaggle / Colab free T4 would work for bigger models, but DMD must not be uploaded. |
-| Own phone clips | protocol ready (`details/RECORDING.md`), not recorded yet. |
+| More own recordings | 2 voice-guided phone takes are in E8; a larger own set (more people, an IR camera) is future work. |

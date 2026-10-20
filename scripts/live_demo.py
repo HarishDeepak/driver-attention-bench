@@ -173,7 +173,7 @@ try:
     tf = wp.transform
     tf.location.z += 0.3
     ebp = world.get_blueprint_library().find("vehicle.tesla.model3")
-    ebp.set_attribute("role_name", "hero")  # lets the replay (carla_video.py) find the ego among the traffic
+    ebp.set_attribute("role_name", "hero")  # marks the ego among the traffic (CARLA recorder queries, e.g. collisions by role "hero")
     ego = world.spawn_actor(ebp, tf)
     actors.append(ego)
     fwd = wp.transform.get_forward_vector()
