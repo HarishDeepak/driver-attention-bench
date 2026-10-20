@@ -1,0 +1,8 @@
+# DMD (Vicomtech Driver Monitoring Dataset, CC BY-NC-ND 4.0, academic use): face-camera RGB videos + labels from scripts/dmd_to_labels.py
+clips_dir = "data/dmd/face"
+labels = "data/dmd/labels.csv"
+out = "out/dmd"
+variants = ["clean"]  # dark and ir were run separately (out/dmd/partial_dark_ir)
+clahe = [false]
+calib_s = 20  # DMD clips often start off-road / eyes closed: median over the first 20 s instead of 2 s (no labels used)
+scope = "data/dmd/scope.csv"  # score a kind only where DMD annotated it
