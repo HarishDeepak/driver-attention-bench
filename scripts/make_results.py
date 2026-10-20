@@ -181,6 +181,9 @@ def main():
     sbs = OUT / "videos/live_20261020_220639_carla.mp4"  # take 5 (own face) driving the CARLA ego: scripts/live_demo.py + carla_video.py
     if sbs.exists():
         clip_gif(sbs, RES / "demo_face_to_carla.gif", 22, 34)
+    stop = OUT / "videos/live_20261020_221211_carla.mp4"  # simulated sleeping driver, full escalation to a stop in lane
+    if stop.exists():
+        clip_gif(stop, RES / "demo_carla_safe_stop.gif", 8, 25, fps=4, width=560)
     if (OUT / "fm/ir_eye_probe.csv").exists():
         ir_chart(OUT / "fm/ir_eye_probe.csv", RES / "infrared_eye_state.png")
     live = ROOT / "data/clips/clip05_live.mp4"  # own face, phone camera, voice-guided take, hand-labelled truth (publishable, unlike DMD)
