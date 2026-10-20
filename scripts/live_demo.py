@@ -185,7 +185,8 @@ try:
     tm.set_desired_speed(ego, CRUISE)
     # pin the TM to the start lane: at highway splits it otherwise picks a random branch (seen in a replay: the minimal-risk
     # stop ended at an exit gore instead of in lane)
-    tm.set_path(ego, lane_path(wp, AHEAD))
+    route = max(AHEAD, 1.2 * CRUISE / 3.6 * a.seconds)  # the TM stops where its path ends: cover the whole run
+    tm.set_path(ego, lane_path(wp, route))
     # traffic in the neighbouring lanes at normal speed: shows the ego slowing and stopping, and makes the stop a stop in traffic
     cars = [b for b in world.get_blueprint_library().filter("vehicle.*") if int(b.get_attribute("number_of_wheels")) == 4]
     for i, (side, ahead) in enumerate(TRAFFIC):
@@ -202,7 +203,7 @@ try:
         car.set_autopilot(True, tm.get_port())
         tm.auto_lane_change(car, False)
         tm.set_desired_speed(car, CRUISE + 5 * (i % 3))
-        tm.set_path(car, lane_path(at, AHEAD))
+        tm.set_path(car, lane_path(at, route))
     chase, vw = None, None
     if not a.headless or a.video:
         bp = world.get_blueprint_library().find("sensor.camera.rgb")
