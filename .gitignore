@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.log
+data/raw/
+out/
+data/clips/
+models/*.task
+data/dmd/
+models/*.onnx
+data/synthetic/
+tools/blender/tmp_still.png
+
+# local notes (not published)
+HANDOFF.md
+CLAUDE.md
+.vibe-wise/
+docs/LEARN.md
+docs/details/RESEARCH.md
