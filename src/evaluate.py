@@ -58,7 +58,7 @@ def calib_end(fr):
 def arm_of(variant):
     """'clean_clahe_ear' -> ('clean_clahe', 'ear'); no arm suffix -> arm 'default'."""
     t = variant.split("_")
-    arm = [x for x in t if x in ("ear", "mobilegaze")]
+    arm = [x for x in t if x in ("ear", "dino", "mobilegaze")]
     return "_".join(x for x in t if x not in arm), "_".join(arm) or "default"
 
 

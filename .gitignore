@@ -16,3 +16,4 @@ CLAUDE.md
 .vibe-wise/
 docs/LEARN.md
 docs/details/RESEARCH.md
+models/*.npz

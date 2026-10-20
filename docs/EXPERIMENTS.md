@@ -97,6 +97,22 @@ At 80 km/h a 2 s warning is too late even for an attentive driver: the sweep sho
 **Live escalation** (`scripts/live_demo.py`, simulated driver, eyes closed from 2 s): warning 3.5 s, slowing 10 s, minimal-risk stop 15 s,
 standstill 22.5 s (`results/live_escalation.png`). The DMS state is also published as ROS 2 topic `/dms/state` and recorded to a rosbag (`details/ROS2.md`).
 
+## E8. Live phone camera (own face, voice-guided takes)
+
+Phone (Xiaomi 14) as a Windows connected camera; `scripts/run_clip.py 0 --show --record`; a spoken guide (Windows TTS) logs
+cue times. Truth is labelled by hand from the raw frames, independent of the system's output.
+
+| Take | Arm | Result |
+|---|---|---|
+| 4 | DINOv2 + linear probe, live (17 ms/frame GPU, ~15 fps overall) | real closure P(closed) ≈ 0.99, microsleep + sleep on time; 1 likely false microsleep while looking ahead (P ≈ 0.5-0.65): the DMD-trained probe is unsure on a new face and camera |
+| 5 | blink score (default), ~30 fps | first run: 4/4 warnings, but looking down was 0.8 s late. After the fix below: 4/4 within ±0.2 s, 0 false alerts |
+
+**Bug found by the live take:** looking down lowers the eyelids, so a few frames read as "closed". Each such frame ended the
+look-away episode and restarted the 3 s distraction timer. Fix in `dms_core.Monitor`: closed gaps of up to 0.5 s bridge a
+look-away episode (a long closure stays sleep, not distraction). A first version without the 0.5 s bound created a false
+distraction warning during a real eye closure; the bounded version was re-checked on all data: synthetic 15/18 with 0 false
+alerts and DMD identical on every arm. The 0.5 s bound comes from one take.
+
 ## E7. Speed
 
 | Part | Speed |

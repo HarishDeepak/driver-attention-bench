@@ -24,14 +24,18 @@ def draw(img, r, t, warns, truth=None):
     else:
         eyes = "unknown" if r["eyes_unknown"] == "1" else "CLOSED" if r["closed"] == "1" else "open"
         put(f"t={t:5.1f}s  system: eyes {eyes}", 22, RED if eyes == "CLOSED" else GREEN)
-        put(f"looking {'AWAY' if r['away'] == '1' else 'at road'}", 22, RED if r["away"] == "1" else GREEN, x=int(w * 0.45))
+        # eyes closed / unknown: no gaze to measure, "away" comes from head pose only -> say so instead of "looking"
+        blind = eyes != "open"
+        look = ("head AWAY" if r["away"] == "1" else "head toward road") if blind else ("looking AWAY" if r["away"] == "1" else "looking at road")
+        put(look, 22, RED if r["away"] == "1" else GREEN, x=int(w * 0.45))
     if truth is not None:
         put(f"truth: {truth}", 46, YELLOW)
     if r["face"] == "1" and r["blink"] != "":
-        b = float(r["blink"])
+        dino = r.get("dino", "") != ""
+        b = float(r["dino"] if dino else r["blink"])
         cv2.rectangle(img, (w - 170, 12), (w - 20, 26), WHITE, 1)
         cv2.rectangle(img, (w - 170, 12), (w - 170 + int(150 * b), 26), YELLOW, -1)
-        put("blink score", 42, WHITE, x=w - 170)
+        put("DINOv2 P(closed)" if dino else "blink score", 42, WHITE, x=w - 170)
     else:
         put("no face", 42, RED, x=w - 170)
     for j, (tw, k) in enumerate([x for x in warns if x[0] <= t][-1:]):

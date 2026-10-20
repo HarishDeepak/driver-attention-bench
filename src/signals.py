@@ -68,12 +68,17 @@ class FaceSignals:
     After each call `self.fb` is None, or (MediaPipe lost the face but YuNet still sees one) a dict with
     the face box and, in the mobilegaze arm, gaze_yaw / gaze_pitch."""
 
-    def __init__(self, model=MODEL, use_clahe=False, gaze=False, yunet=True):
+    def __init__(self, model=MODEL, use_clahe=False, gaze=False, yunet=True, dino=False):
         opts = vision.FaceLandmarkerOptions(
             base_options=mpt.BaseOptions(model_asset_path=str(model)), running_mode=vision.RunningMode.VIDEO, num_faces=1,
             output_face_blendshapes=True, output_facial_transformation_matrixes=True)
         self.lm, self.use_clahe, self.last_ms, self.fb = vision.FaceLandmarker.create_from_options(opts), use_clahe, -1, None
         self.gaze = MobileGaze() if gaze else None
+        if dino:
+            from dino_eye import DinoEye  # lazy: only the dino arm needs torch
+            self.dino = DinoEye()
+        else:
+            self.dino = None
         self.yunet = None
         if yunet:
             if YUNET.exists():
@@ -122,6 +127,8 @@ class FaceSignals:
             landmarks=lm)
         if self.gaze and (g := self.gaze(bgr, (*px.min(0), *px.max(0)))):
             sig.update(gaze_yaw=g[0], gaze_pitch=g[1])
+        if self.dino and (d := self.dino(bgr, px, EYES)) is not None:
+            sig["dino"] = d  # P(eyes closed) from DINOv2 + linear probe
         return sig
 
 
@@ -167,7 +174,7 @@ class Classifier:
                 self.buf.append(s)
             if self.t0 is None or t - self.t0 < self.calib_s:
                 return None
-            self.base = {k: median(x[k] for x in self.buf) for k in self.buf[0] if k != "landmarks"}
+            self.base = {k: median(x[k] for x in self.buf) for k in self.buf[0] if k != "landmarks" and all(k in x for x in self.buf)}
             # ponytail: halfway between open baseline and fully closed (blink 1.0 / EAR 0); no per-driver closed sample
             self.closed_thr = self.base["blink"] + self.closed_frac * (1 - self.base["blink"])
             self.ear_thr = (1 - self.closed_frac) * self.base["ear"]
@@ -181,17 +188,20 @@ class Classifier:
             # YuNet still sees a face: face present, landmarks lost -> eyes unobservable; gaze from the crop if we have it, else away as before
             return None, (self._dev(fb) if self.gaze == "mobilegaze" and "gaze_yaw" in fb else True)
         b = self.base
-        self.vals.append(s["blink"] if self.eye == "blend" else s["ear"])
+        self.vals.append(s["blink"] if self.eye == "blend" else s["ear"] if self.eye == "ear" else s.get("dino", self.vals[-1] if self.vals else 0.0))
         self.ratios.append(s.get("eye_ratio", 1.0))
         unk = median(self.ratios) < self.unk_ratio
-        closed = None if unk else (median(self.vals) > self.closed_thr if self.eye == "blend" else median(self.vals) < self.ear_thr)
+        # dino: the probe outputs a probability learned across drivers, so no per-driver threshold: closed when P(closed) > 0.5
+        closed = None if unk else (median(self.vals) > self.closed_thr if self.eye == "blend" else median(self.vals) < self.ear_thr
+                                   if self.eye == "ear" else median(self.vals) > 0.5)
         away = abs(s["yaw"] - b["yaw"]) > self.yaw_deg or abs(s["pitch"] - b["pitch"]) > self.pitch_deg
         eyes_seen = not unk and not closed  # dark lenses or closed lids: eye direction is meaningless -> head pose only
         if self.gaze == "mobilegaze" and eyes_seen and "gaze_yaw" in s:
             away = self._dev(s)
         elif eyes_seen:
             away = away or math.hypot(s["eye_h"] - b["eye_h"], s["eye_v"] - b["eye_v"]) > self.eye_dev
-        clo = (s["blink"] - b["blink"]) / (1 - b["blink"]) if self.eye == "blend" else 1 - s["ear"] / b["ear"]
+        clo = ((s["blink"] - b["blink"]) / (1 - b["blink"]) if self.eye == "blend" else 1 - s["ear"] / b["ear"] if self.eye == "ear"
+               else self.vals[-1])
         self._perclos(t, None if unk else min(max(clo, 0), 1))
         self.last, self.last_t = (closed, away), t
         return self.last
@@ -255,4 +265,7 @@ if __name__ == "__main__":
     assert c.step(2.1, sig(yaw=60, gaze_yaw=10, gaze_pitch=0)) == (False, False)
     assert c.step(2.2, sig(gaze_yaw=40, gaze_pitch=-3))[1] and c.step(2.3, sig(gaze_yaw=5, gaze_pitch=25))[1]
     assert c.step(4.0, None, dict(gaze_yaw=5, gaze_pitch=-3)) == (None, False) and c.step(4.1, None, dict(gaze_yaw=60, gaze_pitch=0)) == (None, True)
+    # DINOv2 arm: closed when the probe's P(closed) median > 0.5, independent of the blink score
+    c = calibrated(Classifier(eye="dino"), dino=0.1)
+    assert [c.step(2.1 + i / hz, sig(blink=0.0, dino=0.9))[0] for i in range(3)] == [False, True, True]
     print("signals OK")

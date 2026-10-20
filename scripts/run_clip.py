@@ -19,7 +19,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("source", help="video path or camera index")
 ap.add_argument("--variant", choices=V, default="clean")
 ap.add_argument("--clahe", action="store_true")
-ap.add_argument("--eye", choices=["blend", "ear"], default="blend", help="eye-closure method: blink blendshape or EAR")
+ap.add_argument("--eye", choices=["blend", "ear", "dino"], default="blend", help="eye-closure method: blink blendshape, EAR, or DINOv2 + probe (GPU)")
 ap.add_argument("--gaze", choices=["heuristic", "mobilegaze"], default="heuristic", help="gaze arm: head pose + eyeLook, or MobileGaze ONNX")
 ap.add_argument("--calib-s", type=float, default=2.0, help="calibration window (s, median over it; warnings impossible meanwhile): 2 for live/own clips, 20-30 for clips that start off-road")
 ap.add_argument("--show", action="store_true")
@@ -30,13 +30,14 @@ a = ap.parse_args()
 live = a.source.isdigit()
 cap = cv2.VideoCapture(int(a.source) if live else a.source)
 assert cap.isOpened(), f"cannot open {a.source}"
-main = FaceSignals(use_clahe=a.clahe, gaze=a.gaze == "mobilegaze")
+main = FaceSignals(use_clahe=a.clahe, gaze=a.gaze == "mobilegaze", dino=a.eye == "dino")
 helper = FaceSignals(yunet=False) if a.variant in ("sunglasses", "mask") else None
 clf, mon = Classifier(calib_s=a.calib_s, eye=a.eye, gaze=a.gaze), Monitor()
-stem = ("camera" if live else Path(a.source).stem) + f"__{a.variant}" + ("_clahe" if a.clahe else "") + ("_ear" if a.eye == "ear" else "") + ("_mobilegaze" if a.gaze == "mobilegaze" else "")
+stem = ("camera" if live else Path(a.source).stem) + f"__{a.variant}" + ("_clahe" if a.clahe else "") + ("_" + a.eye if a.eye != "blend" else "") + ("_mobilegaze" if a.gaze == "mobilegaze" else "")
 out = Path(a.out)
 out.mkdir(parents=True, exist_ok=True)
 t_start, last_kept, rows, warns = time.monotonic(), None, [], []
+wall0 = time.time()  # wall clock at t = 0: lets external cue logs (e.g. a spoken guide) become labels without using any detection
 n_fb, rec = 0, None
 
 while True:
@@ -65,10 +66,12 @@ while True:
     rows.append([round(t, 3), int(s is not None), f("blink"), f("yaw"), f("pitch"), f("eye_h"), f("eye_v")]
                 + ([int(st[0]) if st[0] is not None else "", int(st[1])] if st else ["", ""])
                 + [f("ear"), "" if clf.perclos is None else round(clf.perclos, 4), "" if st is None else int(st[0] is None), int(main.fb is not None),
-                   round(g["gaze_yaw"], 2) if "gaze_yaw" in g else "", round(g["gaze_pitch"], 2) if "gaze_pitch" in g else ""])
+                   round(g["gaze_yaw"], 2) if "gaze_yaw" in g else "", round(g["gaze_pitch"], 2) if "gaze_pitch" in g else "",
+                   round(s["dino"], 4) if s and "dino" in s else ""])
     if a.show:
         img = variants.apply(a.variant, frame, lm)
-        txt = "calibrating" if st is None else f"closed={st[0]} (None=unknown) away={st[1]}"
+        txt = "calibrating" if st is None else f"closed={st[0]} (None=unknown) " + ("head_away" if st[0] is not False else "away") + f"={st[1]}"
+        txt += f" P(closed)={s['dino']:.2f}" if s and "dino" in s else ""
         cv2.putText(img, f"t={t:.2f} face={s is not None} {txt}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
         for i, (tw, k) in enumerate(warns[-3:]):
             cv2.putText(img, f"WARN {k} @{tw:.2f}", (10, 55 + 25 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
@@ -82,8 +85,10 @@ if rec:
 cv2.destroyAllWindows()
 with open(out / f"{stem}_frames.csv", "w", newline="") as fh:
     cw = csv.writer(fh)
-    cw.writerow("t,face,blink,yaw,pitch,eye_h,eye_v,closed,away,ear,perclos,eyes_unknown,face_fallback,gaze_yaw,gaze_pitch".split(","))
+    cw.writerow("t,face,blink,yaw,pitch,eye_h,eye_v,closed,away,ear,perclos,eyes_unknown,face_fallback,gaze_yaw,gaze_pitch,dino".split(","))
     cw.writerows(rows)
+if live:
+    (out / f"{stem}_t0.txt").write_text(f"{wall0:.3f}\n")  # unix time of t = 0
 with open(out / f"{stem}_warnings.csv", "w", newline="") as fh:
     cw = csv.writer(fh)
     cw.writerow(["t", "kind"])

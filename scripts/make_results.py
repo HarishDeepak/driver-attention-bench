@@ -129,9 +129,9 @@ def main():
     if live:
         live_escalation(live[-1], RES / "live_escalation.png")
     cosmos_panel(OUT / "cosmos", RES / "carla_control_videos.png")
-    live = ROOT / "data/clips/clip03_live.mp4"  # own face, phone camera, voice-guided take (publishable, unlike DMD)
+    live = ROOT / "data/clips/clip05_live.mp4"  # own face, phone camera, voice-guided take, hand-labelled truth (publishable, unlike DMD)
     if live.exists():
-        live_gif(live, OUT / "live_runs3/camera__clean_frames.csv", OUT / "live_runs3/cue_labels.csv", RES / "demo_live_phone.gif", 17, 48)
+        live_gif(live, OUT / "live_runs5/camera__clean_frames.csv", OUT / "live_runs5/labels_hand.csv", RES / "demo_live_phone.gif", 21, 51)
     clip = "synth02_sleep"
     n = demo_gif(ROOT / "data/synthetic" / f"{clip}.mp4", OUT / "synthetic/runs" / f"{clip}__clean_frames.csv",
                  OUT / "synthetic/runs" / f"{clip}__clean_warnings.csv", RES / "demo_synthetic_sleep.gif")

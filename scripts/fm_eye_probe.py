@@ -26,6 +26,7 @@ from sklearn.preprocessing import StandardScaler  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "scripts")]
 from dmd_to_labels import runs  # noqa: E402
+from dino_eye import eye_crop  # noqa: E402
 from signals import EYES, FaceSignals  # noqa: E402
 
 FACE, ANN = ROOT / "data/dmd/face", ROOT / "data/dmd/ann"
@@ -49,13 +50,6 @@ def frame_labels(vcd):
         for a, b in runs(vcd, lambda t: t == want):
             lab.update((f, y) for f in range(a, b + 1))
     return lab
-
-
-def eye_crop(bgr, pts):
-    """Square crop, 1.8x the larger side of the eye landmarks, centred on them (clipped at the frame border)."""
-    (x0, y0), (x1, y1) = pts.min(0), pts.max(0)
-    cx, cy, s = (x0 + x1) / 2, (y0 + y1) / 2, 1.8 * max(x1 - x0, y1 - y0)
-    return bgr[max(int(cy - s / 2), 0):int(cy + s / 2), max(int(cx - s / 2), 0):int(cx + s / 2)]
 
 
 def as_tensor(o):
