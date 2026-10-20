@@ -59,6 +59,14 @@ safe-stop manoeuvre from 15 s, standstill at 22.5 s.</sub></p>
    3-9 seconds per frame. For a warning that must come within 0.2 s, the small fast model is the right tool.
    On **real infrared** eye images (night-time cameras), an eye model trained on daylight video dropped to 0.69-0.76; trained on
    infrared it reached 0.93-0.94 on unseen people. Day-to-night is a real gap, which is why car DMS cameras are infrared.
+   On **night-time videos of real drivers** the eyes were often reported open while shut: a fragile calibration step learned the
+   wrong "normal" when a driver blinked during it. A robust calibration plus the EAR signal raised hand-labelled night hits from
+   7 to 16 of 27 without hurting any other dataset.
+
+<p align="center">
+  <img src="results/demo_night_nitymed.gif" width="560" alt="Night-time driver: microsleep and sleep warnings">
+</p>
+<p align="center"><sub>Night driving, real car (NITYMED, CC BY 4.0, Petrellis et al.): EAR with robust calibration; yellow = hand-labelled truth.</sub></p>
 3. **Driver state changes the crash outcome, and detector accuracy decides by how much.** In CARLA, a distracted driver with a
    standard collision warning crashes at 30 and 50 km/h; warning earlier because the camera flags the distraction avoids both.
    A Monte Carlo over driver reaction times then plugs in the accuracy measured on real drivers: at 50 km/h the crash rate falls

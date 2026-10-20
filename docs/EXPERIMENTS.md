@@ -162,6 +162,31 @@ model, but it links the perception metric to a vehicle-level outcome, which is w
 
 ![DMS safety Monte Carlo](../results/dms_safety_mc.png)
 
+## E11. Night-time driving (NITYMED) and a calibration fix
+
+NITYMED: 19 videos of drivers at night in real moving cars, dash camera, 25 fps, CC BY 4.0 (Petrellis et al.). The face was found
+in 97-100 % of frames, but watching the overlays showed eyes reported "open" while clearly shut. Two causes, measured:
+1. In low light the blink score rarely passes 0.8 for a closed eye (peaks ~0.6-0.8), close to the closed threshold.
+2. The per-driver baseline was the median of the first seconds. In 3 of 19 videos the driver blinked or looked down then, the
+   "open" blink level came out as 0.31-0.56 instead of ~0.1, and the closed threshold rose to 0.78: closures were never "closed".
+
+Fix: **robust calibration**. "Eyes open" = the most-open 20 % of the calibration window (blink 20th / EAR 80th percentile), capped at
+plausible open values. Truth: two night videos hand-labelled at 0.5 s steps without the system's output (25 microsleeps, 27
+expected warnings). Hand labels are ±0.3 s, so a hit here = warning between the required moment -0.5 s and the event end +0.5 s.
+
+| Method | Night: hits / false alerts | DMD (lids shut, ±0.2 s) | Synthetic | Own take 5 |
+|---|---|---|---|---|
+| Blink, median calibration (old default) | 7/27, 0 | 22/49, 8 | 15/18, 0 | 4/4, 0 |
+| Blink, robust calibration (new default) | 10/27, 0 | 22/49, 8 | 15/18, 0 | 4/4, 0 |
+| Blink, one fixed threshold 0.4 | 15/27, 2 | 30/49, 20 | 15/18, 0 | 3/4, 2 |
+| EAR, median calibration | 10/27, 0 | 30/49, 14 | 15/18, 0 | 3/4, 2 |
+| **EAR, robust calibration** | **16/27, 1** | 31/49, 17 | 15/18, 0 | 3/4, 2 |
+
+Reading: robust calibration costs nothing on any other dataset and helps at night, so it is now the default. Per-driver calibration
+is not useless: a fixed EAR threshold collapses on DMD (eye shapes differ); a fixed blink threshold helps at night but adds false
+alerts in daylight. No single eye signal wins everywhere: EAR is better on DMD and at night, the blink score on the daytime phone
+take. Default stays blink score; EAR (`--eye ear`) is the recommended setting for night and real-car footage.
+
 ## E7. Speed
 
 | Part | Speed |

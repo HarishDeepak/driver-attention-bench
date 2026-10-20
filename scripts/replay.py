@@ -30,12 +30,12 @@ def replay(frames, eye, gaze, **kw):
     return warns, ce
 
 
-def score(frames, warns, ce, events, scope):
+def score(frames, warns, ce, events, scope, tol=None):
     """-> (hits, expected, false alerts, scored hours) for one run, same rules as evaluate.py (scope + calibration)."""
     ev = [e for e in events if ce is not None and e[1] >= ce]
     if scope:
         ev, warns = apply_scope(ev, warns, scope)
-    rows = score_run(ev, warns)
+    rows = score_run(ev, warns, tol)
     hours = sum(b - max(a, ce) for rg in scope.values() for a, b in rg if b > ce) / 3600 if scope and ce is not None else float(frames[-1]["t"]) / 3600
     return sum(r[5] == "hit" for r in rows), sum(r[5] != "false_alert" for r in rows), sum(r[5] == "false_alert" for r in rows), hours
 
@@ -52,33 +52,37 @@ def main():
     ap.add_argument("--scope")
     ap.add_argument("--calib-s", type=float, default=20.0)
     ap.add_argument("--closed-frac", type=float, nargs="+", default=[0.5])
-    ap.add_argument("--loso", action="store_true", help="leave-one-subject-out choice of closed-frac (objective: hits - false alerts)")
+    ap.add_argument("--fixed-thr", type=float, nargs="*", default=[], help="also try one absolute eye threshold for everyone (no per-driver eye calibration); applied to the arm's own signal (blink or EAR)")
+    ap.add_argument("--tol", type=float, help="lenient labels (e.g. hand-labelled at 0.5 s steps): hit = warning from required moment - tol until event end + tol")
+    ap.add_argument("--robust", action="store_true", help="also try the robust calibration (most-open 20 % of the window)")
+    ap.add_argument("--loso", action="store_true", help="leave-one-subject-out choice of the setting (objective: hits - false alerts)")
     a = ap.parse_args()
     events, sc = defaultdict(list), defaultdict(lambda: defaultdict(list))
     for r in read(a.labels):
         events[r["clip"]].append((r["kind"], float(r["t_start"]), float(r["t_end"])))
     for r in read(a.scope) if a.scope else []:
         sc[r["clip"]][r["kind"]].append((float(r["t_start"]), float(r["t_end"])))
-    res = defaultdict(dict)  # (arm, clip) -> {frac: (h, n, fa, hours)}
+    settings = [("closed_frac", f) for f in a.closed_frac] + [("fixed_eye_thr", v) for v in a.fixed_thr] + ([("robust", True)] if a.robust else [])
+    res = defaultdict(dict)  # (arm, clip) -> {setting: (h, n, fa, hours)}
     for ff in sorted(Path(a.runs).glob("*_frames.csv")):
         clip, variant = ff.name[: -len("_frames.csv")].rsplit("__", 1)
         eye, gaze = ("ear" if "_ear" in variant else "blend"), ("mobilegaze" if "mobilegaze" in variant else "heuristic")
         fr = read(ff)
-        for f in a.closed_frac:
-            w, ce = replay(fr, eye, gaze, calib_s=a.calib_s, closed_frac=f)
-            res[(variant, clip)][f] = score(fr, w, ce, events.get(clip, []), sc[clip] if a.scope else None)
+        for f in settings:
+            w, ce = replay(fr, eye, gaze, calib_s=a.calib_s, **dict([f]))
+            res[(variant, clip)][f] = score(fr, w, ce, events.get(clip, []), sc[clip] if a.scope else None, a.tol)
     tot = lambda cells: [sum(c[i] for c in cells) for i in range(4)]
     for arm in sorted({k[0] for k in res}):
         clips = [k[1] for k in res if k[0] == arm]
         print(f"== {arm}")
-        for f in a.closed_frac:
-            print(line(f"closed_frac {f}", *tot([res[(arm, c)][f] for c in clips])))
+        for f in settings:
+            print(line(f"{f[0]} {f[1]}", *tot([res[(arm, c)][f] for c in clips])))
         if a.loso:
             subj = lambda c: c.split("_s")[0]
             pick, cells = {}, []
             for s in sorted({subj(c) for c in clips}):
                 train = [c for c in clips if subj(c) != s]
-                pick[s] = max(a.closed_frac, key=lambda f: (lambda t: t[0] - t[2])(tot([res[(arm, c)][f] for c in train])))
+                pick[s] = max(settings, key=lambda f: (lambda t: t[0] - t[2])(tot([res[(arm, c)][f] for c in train])))
                 cells += [res[(arm, c)][pick[s]] for c in clips if subj(c) == s]
             print(line("LOSO-picked", *tot(cells)), " picks:", pick)
 

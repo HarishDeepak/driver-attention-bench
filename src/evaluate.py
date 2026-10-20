@@ -21,7 +21,7 @@ def wilson(k, n, z=1.96):
     return (c - h) / d, (c + h) / d
 
 
-def score_run(events, warns):
+def score_run(events, warns, tol=None):
     """events: [(kind, t_start, t_end)], warns: [(t, kind)] -> rows (event, kind, t_expected, t_warn, err, outcome)."""
     rows, used = [], set()
     for i, (ek, t0, t1) in enumerate(events):
@@ -36,7 +36,7 @@ def score_run(events, warns):
             j = min(cand, key=lambda j: abs(warns[j][0] - te))
             used.add(j)
             err = timing_error(warns[j][0], t0, req)
-            rows.append((f"{ek}@{t0:g}", wk, te, warns[j][0], err, "hit" if within_tol(err) else "late" if err > 0 else "early"))
+            rows.append((f"{ek}@{t0:g}", wk, te, warns[j][0], err, "hit" if (within_tol(err) if tol is None else -tol <= err <= tol + t1 - te) else "late" if err > 0 else "early"))
     rows += [("", k, None, t, None, "false_alert") for j, (t, k) in enumerate(warns) if j not in used]
     return rows
 

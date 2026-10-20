@@ -147,9 +147,14 @@ class Classifier:
     # ponytail: thresholds are calibration knobs, tune per camera; a fixed 25 deg / 20 deg cone ignores seat position and camera mounting angle
     # ponytail: unk_ratio 0.3 sits between one still face (open eyes ~0.45) and the synthetic sunglasses variant (~0.2) only, needs real clips behind real lenses
     def __init__(self, calib_s=2.0, hold_s=0.5, yaw_deg=25, pitch_deg=20, eye_dev=0.35, smooth=3, eye="blend", gaze="heuristic",
-                 unk_ratio=0.3, perclos_s=60.0, closed_frac=0.5):
+                 unk_ratio=0.3, perclos_s=60.0, closed_frac=0.5, fixed_eye_thr=None, robust=True):
         self.calib_s, self.hold_s, self.yaw_deg, self.pitch_deg, self.eye_dev = calib_s, hold_s, yaw_deg, pitch_deg, eye_dev
         self.closed_frac = closed_frac  # how far from the open baseline towards fully closed counts as closed
+        self.fixed_eye_thr = fixed_eye_thr  # if set: one absolute eye threshold for everyone (blink > thr / EAR < thr), no per-driver eye calibration
+        # robust: "eyes open" = the most-open 20 % of the calibration window (blink 20th / EAR 80th percentile), capped at plausible
+        # open values, instead of the median: blinks, drowsy lids or a glance down in that window no longer shift the baseline
+        # (night clips: median baselines of 0.53-0.56 pushed the threshold to 0.78 and hid real closures)
+        self.robust = robust
         self.eye, self.gaze, self.unk_ratio, self.perclos_s = eye, gaze, unk_ratio, perclos_s
         self.buf, self.t0, self.base = [], None, None
         self.vals, self.ratios, self.closure = deque(maxlen=smooth), deque(maxlen=smooth), deque()
@@ -175,9 +180,14 @@ class Classifier:
             if self.t0 is None or t - self.t0 < self.calib_s:
                 return None
             self.base = {k: median(x[k] for x in self.buf) for k in self.buf[0] if k != "landmarks" and all(k in x for x in self.buf)}
+            if self.robust:
+                self.base["blink"] = min(float(np.percentile([x["blink"] for x in self.buf], 20)), 0.3)
+                self.base["ear"] = max(float(np.percentile([x["ear"] for x in self.buf], 80)), 0.2)
             # ponytail: halfway between open baseline and fully closed (blink 1.0 / EAR 0); no per-driver closed sample
             self.closed_thr = self.base["blink"] + self.closed_frac * (1 - self.base["blink"])
             self.ear_thr = (1 - self.closed_frac) * self.base["ear"]
+            if self.fixed_eye_thr is not None:
+                self.closed_thr = self.ear_thr = self.fixed_eye_thr
             self.last_t = t
         if s is None:  # face lost: hold briefly, then we cannot confirm attention
             if t - self.last_t <= self.hold_s:
@@ -265,6 +275,15 @@ if __name__ == "__main__":
     assert c.step(2.1, sig(yaw=60, gaze_yaw=10, gaze_pitch=0)) == (False, False)
     assert c.step(2.2, sig(gaze_yaw=40, gaze_pitch=-3))[1] and c.step(2.3, sig(gaze_yaw=5, gaze_pitch=25))[1]
     assert c.step(4.0, None, dict(gaze_yaw=5, gaze_pitch=-3)) == (None, False) and c.step(4.1, None, dict(gaze_yaw=60, gaze_pitch=0)) == (None, True)
+    # robust calibration: a window that is 40 % closed eyes still gives an open baseline (median would land between open and closed)
+    sigs = [sig(blink=0.9 if i % 5 < 2 else 0.1, ear=0.05 if i % 5 < 2 else 0.3) for i in range(2 * hz + 1)]
+    c, m = Classifier(robust=True), Classifier(robust=False)
+    [(c.step(i / hz, x), m.step(i / hz, x)) for i, x in enumerate(sigs)]
+    assert abs(c.base["blink"] - 0.1) < 1e-9 and abs(c.base["ear"] - 0.3) < 1e-9 and m.base["blink"] == 0.1
+    sigs = [sig(blink=0.9 if i % 5 < 3 else 0.1) for i in range(2 * hz + 1)]  # 60 % closed: median breaks, robust holds
+    c, m = Classifier(robust=True), Classifier(robust=False)
+    [(c.step(i / hz, x), m.step(i / hz, x)) for i, x in enumerate(sigs)]
+    assert abs(c.base["blink"] - 0.1) < 1e-9 and m.base["blink"] == 0.9
     # DINOv2 arm: closed when the probe's P(closed) median > 0.5, independent of the blink score
     c = calibrated(Classifier(eye="dino"), dino=0.1)
     assert [c.step(2.1 + i / hz, sig(blink=0.0, dino=0.9))[0] for i in range(3)] == [False, True, True]

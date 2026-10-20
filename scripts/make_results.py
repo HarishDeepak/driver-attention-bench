@@ -181,6 +181,10 @@ def main():
     sbs = OUT / "videos/carla_real_face_take5.mp4"  # take 5 (own face) driving the CARLA ego: live_demo.py <clip> --video
     if sbs.exists():
         clip_gif(sbs, RES / "demo_face_to_carla.gif", 22, 40, fps=5)
+    night = ROOT / "data/nitymed/microsleep/male_P1042793_720.mp4"  # NITYMED (CC BY 4.0, Petrellis et al.): EAR arm, robust calibration
+    if night.exists():
+        live_gif(night, OUT / "nitymed/robust/male_P1042793_720__clean_ear_frames.csv", OUT / "nitymed/labels_hand.csv",
+                 RES / "demo_night_nitymed.gif", 19, 39)
     stop = OUT / "videos/carla_escalation_sim.mp4"  # simulated sleeping driver: live_demo.py sim:2-40 --video
     if stop.exists():
         clip_gif(stop, RES / "demo_carla_safe_stop.gif", 2, 26, fps=4, width=700)
