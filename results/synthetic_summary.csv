@@ -1,0 +1,2 @@
+variant,hits,expected,rate,ci_lo,ci_hi,median_abs_err,false_alerts,hours,false_alerts_per_h,eyes_unknown_frac,face_fallback_frac
+clean,15,18,0.833,0.608,0.942,0.040,0,0.038,0.000,0.229,0.030

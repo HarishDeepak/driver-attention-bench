@@ -1,0 +1,3 @@
+model,status,n,n_errors,ba_closed,f1_closed,ba_away,f1_away,median_latency_s,eff_fps
+meta/llama-3.2-11b-vision-instruct,ok,142,3,0.594,0.353,0.457,0.0,2.734,0.1
+nvidia/nemotron-3.5-super-vl-120b-a12b,ok,142,29,0.59,0.683,0.632,0.542,8.594,0.07

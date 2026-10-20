@@ -95,7 +95,7 @@ Listed but not callable on the free tier (HTTP 404 "Function not found for accou
 At 80 km/h a 2 s warning is too late even for an attentive driver: the sweep shows the limit of warning-only systems.
 
 **Live escalation** (`scripts/live_demo.py`, simulated driver, eyes closed from 2 s): warning 3.5 s, slowing 10 s, minimal-risk stop 15 s,
-standstill 22.6 s. The DMS state is also published as ROS 2 topic `/dms/state` and recorded to a rosbag (`details/ROS2.md`).
+standstill 22.5 s (`results/live_escalation.png`). The DMS state is also published as ROS 2 topic `/dms/state` and recorded to a rosbag (`details/ROS2.md`).
 
 ## E7. Speed
 

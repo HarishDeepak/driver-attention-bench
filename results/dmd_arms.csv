@@ -1,0 +1,4 @@
+arm,hits,expected,rate,ci_lo,ci_hi,median_abs_err,false_alerts,hours,false_alerts_per_h,eyes_unknown_frac,face_fallback_frac,runs
+default,2,12,0.167,0.047,0.448,1.790,4,0.094,42.628,0.007,0.006,6
+ear,2,12,0.167,0.047,0.448,1.790,4,0.094,42.628,0.007,0.006,6
+mobilegaze,3,12,0.250,0.089,0.532,0.192,3,0.094,31.971,0.007,0.006,6

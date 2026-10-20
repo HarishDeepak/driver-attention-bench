@@ -1,0 +1,6 @@
+method,balanced_acc,f1_closed,n_frames,n_closed,ms_per_frame,device
+(a) blendshape eyeBlink threshold,0.968,0.917,5665,870,46.71,CPU (MediaPipe)
+(b) EAR threshold,0.973,0.924,5665,870,46.71,CPU (MediaPipe)
+(c) CLIP zero-shot,0.698,0.377,5665,870,3.50,cuda
+(d) CLIP linear probe,0.972,0.923,5665,870,3.50,cuda
+(e) DINOv2-small linear probe,0.966,0.926,5665,870,4.54,cuda
