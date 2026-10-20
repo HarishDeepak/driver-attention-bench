@@ -14,8 +14,9 @@ from evaluate import read  # noqa: E402
 GREEN, RED, YELLOW, WHITE = (0, 220, 0), (0, 0, 255), (0, 220, 255), (255, 255, 255)
 
 
-def draw(img, r, t, warns, truth=None):
-    """img: BGR frame (already resized); r: frames.csv row; warns: [(t, kind)] so far; truth: label text or None."""
+def draw(img, r, t, warns, truth=None, bar="blink"):
+    """img: BGR frame (already resized); r: frames.csv row; warns: [(t, kind)] so far; truth: label text or None.
+    bar: which eye signal the run decided with ("blink" or "ear"); a DINOv2 run (dino column filled) always shows P(closed)."""
     h, w = img.shape[:2]
     img[:90] = (img[:90] * 0.3).astype(img.dtype)
     put = lambda s, y, c, x=10: cv2.putText(img, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, c, 1, cv2.LINE_AA)
@@ -32,10 +33,11 @@ def draw(img, r, t, warns, truth=None):
         put(f"truth: {truth}", 46, YELLOW)
     if r["face"] == "1" and r["blink"] != "":
         dino = r.get("dino", "") != ""
-        b = float(r["dino"] if dino else r["blink"])
+        # EAR ~0.3 open .. ~0 closed -> shown as closure 0..1 so every bar reads "full = closed"
+        b = float(r["dino"]) if dino else max(0.0, min(1.0, 1 - float(r["ear"]) / 0.35)) if bar == "ear" else float(r["blink"])
         cv2.rectangle(img, (w - 170, 12), (w - 20, 26), WHITE, 1)
         cv2.rectangle(img, (w - 170, 12), (w - 170 + int(150 * b), 26), YELLOW, -1)
-        put("DINOv2 P(closed)" if dino else "blink score", 42, WHITE, x=w - 170)
+        put("DINOv2 P(closed)" if dino else "eye closure (EAR)" if bar == "ear" else "blink score", 42, WHITE, x=w - 170)
     else:
         put("no face", 42, RED, x=w - 170)
     for j, (tw, k) in enumerate([x for x in warns if x[0] <= t][-1:]):
@@ -56,6 +58,7 @@ def main():
     ap.add_argument("frames")
     ap.add_argument("--labels")
     ap.add_argument("--width", type=int, default=960)
+    ap.add_argument("--bar", choices=["blink", "ear"], help="eye signal bar; default: from the run name (_ear -> ear)")
     ap.add_argument("--out", default=str(ROOT / "out" / "videos"))
     a = ap.parse_args()
     fp = Path(a.frames)
@@ -73,7 +76,7 @@ def main():
             break
         img = cv2.resize(img, (a.width, round(img.shape[0] * a.width / img.shape[1])))
         t = float(r["t"])
-        img = draw(img, r, t, warns, truth_at(events, t) if events is not None else None)
+        img = draw(img, r, t, warns, truth_at(events, t) if events is not None else None, a.bar or ("ear" if "_ear" in run else "blink"))
         if vw is None:
             vw = cv2.VideoWriter(str(dst), cv2.VideoWriter_fourcc(*"mp4v"), fps, (img.shape[1], img.shape[0]))
         vw.write(img)

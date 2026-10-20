@@ -14,11 +14,13 @@ driver makes the car slow down and stop.
 <p align="center"><sub>Live test, phone camera at ~30 fps, voice-guided: eyes closed → microsleep (1.5 s) and sleep (3 s); looking down and
 turning the head → distraction (3 s). Green/red: the system's per-frame decision. Yellow: truth, labelled by hand frame by frame
 without looking at the system's output. Result: 4 of 4 warnings within ±0.2 s, 0 false alerts (one take: a demo, not a statistic).</sub></p>
+<p align="center"><a href="results/videos/live_phone_take5.mp4">▶ full take, 57 s</a> · GIF above is a short excerpt</p>
 
 <p align="center">
   <img src="results/demo_synthetic_sleep.gif" width="300" alt="Synthetic driver closes the eyes; microsleep and sleep warnings fire">
 </p>
 <p align="center"><sub>Same pipeline on a computer-generated driver (Blender), where every label is exact.</sub></p>
+<p align="center"><a href="results/videos/synthetic_sleep.mp4">▶ full clip, 20 s</a></p>
 
 ## How it works, in 4 steps
 
@@ -41,6 +43,7 @@ flowchart LR
 </p>
 <p align="center"><sub>Closed loop with real data: the recorded phone take (left, live detection) drives the CARLA ego car (right).
 Eyes close → sleep warning → DMS level WARNING in the car. The driver looks back within 8 s, so it never escalates further.</sub></p>
+<p align="center"><a href="results/videos/face_to_carla_take5.mp4">▶ full run, 56 s</a> · GIF above is a short excerpt</p>
 
 <p align="center">
   <img src="results/demo_carla_safe_stop.gif" width="420" alt="CARLA: slowing, minimal-risk manoeuvre, lane change right, stop at the lane edge">
@@ -49,6 +52,7 @@ Eyes close → sleep warning → DMS level WARNING in the car. The driver looks 
 <p align="center"><sub>If the driver stays asleep (simulated driver, eyes closed from 2 s): warning 3.5 s, slowing to 60 km/h from 10 s,
 minimal-risk manoeuvre from 15 s (hazards on, CARLA's planner checks the right lane is free, moves one lane right, brakes at
 2 m/s² to the lane's right edge), standstill at 23.2 s.</sub></p>
+<p align="center"><a href="results/videos/carla_minimal_risk_manoeuvre.mp4">▶ full run, 35 s</a> · GIF above is a short excerpt</p>
 
 ## What I found
 
@@ -68,6 +72,7 @@ minimal-risk manoeuvre from 15 s (hazards on, CARLA's planner checks the right l
   <img src="results/demo_night_nitymed.gif" width="560" alt="Night-time driver: microsleep and sleep warnings">
 </p>
 <p align="center"><sub>Night driving, real car (NITYMED, CC BY 4.0, Petrellis et al.): EAR with robust calibration; yellow = hand-labelled truth.</sub></p>
+<p align="center"><a href="results/videos/night_nitymed_P1042793.mp4">▶ full video, 2 min</a> · GIF above is a short excerpt</p>
 3. **Driver state changes the crash outcome, and detector accuracy decides by how much.** In CARLA, a distracted driver with a
    standard collision warning crashes at 30 and 50 km/h; warning earlier because the camera flags the distraction avoids both.
    A Monte Carlo over driver reaction times then plugs in the accuracy measured on real drivers: at 50 km/h the crash rate falls

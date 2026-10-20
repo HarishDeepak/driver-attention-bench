@@ -112,7 +112,7 @@ def live_gif(video, frames_csv, labels_csv, path, t0, t1, fps=6, width=600):
         if t >= t0 and t - last >= 1 / fps:
             last = t
             img = cv2.resize(img, (width, round(img.shape[0] * width / img.shape[1])), interpolation=cv2.INTER_AREA)
-            img = draw(img, r, t, warns, truth_at(events, t))
+            img = draw(img, r, t, warns, truth_at(events, t), "ear" if "_ear" in Path(frames_csv).name else "blink")
             imgs.append(Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)))
     pal = imgs[len(imgs) // 2].quantize(192)  # one shared palette: frames differ little, so GIF frame deltas stay small
     imgs = [im.quantize(palette=pal, dither=Image.Dither.NONE) for im in imgs]
@@ -168,6 +168,29 @@ def clip_gif(video, path, t0, t1, fps=6, width=760):
     imgs[0].save(path, save_all=True, append_images=imgs[1:], duration=1000 // fps, loop=0, optimize=True)
 
 
+FULL = {  # full-length videos next to the short README GIFs (all publishable: own face, synthetic, simulator, NITYMED CC BY 4.0)
+    "videos/clip05_live_overlay.mp4": "live_phone_take5.mp4",
+    "videos/carla_real_face_take5.mp4": "face_to_carla_take5.mp4",
+    "videos/carla_escalation_sim.mp4": "carla_minimal_risk_manoeuvre.mp4",
+    "videos/male_P1042793_720__clean_ear.mp4": "night_nitymed_P1042793.mp4",
+    "videos/synth02_sleep__clean.mp4": "synthetic_sleep.mp4",
+}
+
+
+def full_videos():
+    """Re-encode to H.264 (browser-playable, small) with ffmpeg into results/videos/; DMD videos are never included."""
+    import shutil, subprocess
+    ff = shutil.which("ffmpeg")
+    if not ff:
+        print("ffmpeg not found: full videos skipped")
+        return
+    (RES / "videos").mkdir(exist_ok=True)
+    for src, dst in FULL.items():
+        if (OUT / src).exists():
+            subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(OUT / src), "-vf", "scale='min(960,iw)':-2", "-c:v", "libx264",
+                            "-crf", "30", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", str(RES / "videos" / dst)], check=True)
+
+
 def main():
     RES.mkdir(exist_ok=True)
     for src, dst in COPY.items():
@@ -196,7 +219,8 @@ def main():
     clip = "synth02_sleep"
     n = demo_gif(ROOT / "data/synthetic" / f"{clip}.mp4", OUT / "synthetic/runs" / f"{clip}__clean_frames.csv",
                  OUT / "synthetic/runs" / f"{clip}__clean_warnings.csv", RES / "demo_synthetic_sleep.gif")
-    for p in sorted(RES.iterdir()):
+    full_videos()
+    for p in sorted(RES.rglob("*.*")):
         print(f"{p.name:32} {p.stat().st_size / 1024:8.0f} KiB")
     print(f"gif frames: {n}")
 

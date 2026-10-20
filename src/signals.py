@@ -183,6 +183,11 @@ class Classifier:
             if self.robust:
                 self.base["blink"] = min(float(np.percentile([x["blink"] for x in self.buf], 20)), 0.3)
                 self.base["ear"] = max(float(np.percentile([x["ear"] for x in self.buf], 80)), 0.2)
+                # gaze / head baseline only from open-eye frames: drooping lids raise the eyeLookDown scores, so a drowsy
+                # calibration window learned "looking down" as "ahead" and then flagged every alert glance as away (night clip)
+                opn = [x for x in self.buf if x["ear"] >= 0.75 * self.base["ear"] and x["blink"] <= self.base["blink"] + 0.25]
+                if len(opn) >= max(5, len(self.buf) // 5):
+                    self.base.update({k: median(x[k] for x in opn) for k in ("yaw", "pitch", "eye_h", "eye_v") if all(k in x for x in opn)})
             # ponytail: halfway between open baseline and fully closed (blink 1.0 / EAR 0); no per-driver closed sample
             self.closed_thr = self.base["blink"] + self.closed_frac * (1 - self.base["blink"])
             self.ear_thr = (1 - self.closed_frac) * self.base["ear"]
@@ -284,6 +289,11 @@ if __name__ == "__main__":
     c, m = Classifier(robust=True), Classifier(robust=False)
     [(c.step(i / hz, x), m.step(i / hz, x)) for i, x in enumerate(sigs)]
     assert abs(c.base["blink"] - 0.1) < 1e-9 and m.base["blink"] == 0.9
+    # robust gaze baseline: drowsy frames in the window (lids down, eyes "looking down") do not set the "ahead" direction
+    sigs = [sig(blink=0.8, ear=0.08, eye_v=-0.7) if i % 5 < 2 else sig(eye_v=0.0) for i in range(2 * hz + 1)]
+    c = Classifier()
+    [c.step(i / hz, x) for i, x in enumerate(sigs)]
+    assert c.base["eye_v"] == 0.0 and c.step(2.2, sig(eye_v=0.0)) == (False, False)
     # DINOv2 arm: closed when the probe's P(closed) median > 0.5, independent of the blink score
     c = calibrated(Classifier(eye="dino"), dino=0.1)
     assert [c.step(2.1 + i / hz, sig(blink=0.0, dino=0.9))[0] for i in range(3)] == [False, True, True]
