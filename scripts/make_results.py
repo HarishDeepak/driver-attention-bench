@@ -97,6 +97,28 @@ def cosmos_panel(d, path, sec=2.5):
     cv2.imwrite(str(path), cv2.hconcat(tiles))
 
 
+def live_gif(video, frames_csv, labels_csv, path, t0, t1, fps=6, width=600):
+    """Overlay drawn at GIF size (sharp text), [t0, t1] s of a recorded run, adaptive 256-colour palette per frame."""
+    from render_overlay import draw, truth_at
+    fr = read(frames_csv)
+    warns = [(float(w["t"]), w["kind"]) for w in read(Path(frames_csv).with_name(Path(frames_csv).name.replace("_frames", "_warnings")))]
+    events = [(x["kind"], float(x["t_start"]), float(x["t_end"])) for x in read(labels_csv)]
+    cap, imgs, last = cv2.VideoCapture(str(video)), [], -1.0
+    for r in fr:
+        ok, img = cap.read()
+        t = float(r["t"])
+        if not ok or t > t1:
+            break
+        if t >= t0 and t - last >= 1 / fps:
+            last = t
+            img = cv2.resize(img, (width, round(img.shape[0] * width / img.shape[1])), interpolation=cv2.INTER_AREA)
+            img = draw(img, r, t, warns, truth_at(events, t))
+            imgs.append(Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)))
+    pal = imgs[len(imgs) // 2].quantize(192)  # one shared palette: frames differ little, so GIF frame deltas stay small
+    imgs = [im.quantize(palette=pal, dither=Image.Dither.NONE) for im in imgs]
+    imgs[0].save(path, save_all=True, append_images=imgs[1:], duration=1000 // fps, loop=0, optimize=True)
+
+
 def main():
     RES.mkdir(exist_ok=True)
     for src, dst in COPY.items():
@@ -107,6 +129,9 @@ def main():
     if live:
         live_escalation(live[-1], RES / "live_escalation.png")
     cosmos_panel(OUT / "cosmos", RES / "carla_control_videos.png")
+    live = ROOT / "data/clips/clip03_live.mp4"  # own face, phone camera, voice-guided take (publishable, unlike DMD)
+    if live.exists():
+        live_gif(live, OUT / "live_runs3/camera__clean_frames.csv", OUT / "live_runs3/cue_labels.csv", RES / "demo_live_phone.gif", 17, 48)
     clip = "synth02_sleep"
     n = demo_gif(ROOT / "data/synthetic" / f"{clip}.mp4", OUT / "synthetic/runs" / f"{clip}__clean_frames.csv",
                  OUT / "synthetic/runs" / f"{clip}__clean_warnings.csv", RES / "demo_synthetic_sleep.gif")

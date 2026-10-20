@@ -23,6 +23,7 @@ ap.add_argument("--eye", choices=["blend", "ear"], default="blend", help="eye-cl
 ap.add_argument("--gaze", choices=["heuristic", "mobilegaze"], default="heuristic", help="gaze arm: head pose + eyeLook, or MobileGaze ONNX")
 ap.add_argument("--calib-s", type=float, default=2.0, help="calibration window (s, median over it; warnings impossible meanwhile): 2 for live/own clips, 20-30 for clips that start off-road")
 ap.add_argument("--show", action="store_true")
+ap.add_argument("--record", help="also save the raw input video here (.mp4), e.g. a live camera session to score and label later")
 ap.add_argument("--out", default=str(ROOT / "out" / "runs"))
 a = ap.parse_args()
 
@@ -36,7 +37,7 @@ stem = ("camera" if live else Path(a.source).stem) + f"__{a.variant}" + ("_clahe
 out = Path(a.out)
 out.mkdir(parents=True, exist_ok=True)
 t_start, last_kept, rows, warns = time.monotonic(), None, [], []
-n_fb = 0
+n_fb, rec = 0, None
 
 while True:
     ok, frame = cap.read()
@@ -47,6 +48,9 @@ while True:
     if a.variant == "fps25" and last_kept is not None and t - last_kept < 1 / 25 - 1e-3:
         continue
     last_kept = t
+    if a.record:  # ponytail: fixed 30 fps container; a live camera's real rate varies, the frames CSV keeps the true timestamps
+        rec = rec or cv2.VideoWriter(a.record, cv2.VideoWriter_fourcc(*"mp4v"), 30, (frame.shape[1], frame.shape[0]))
+        rec.write(frame)
     lm = None
     if helper:
         h = helper(frame, t * 1000)
@@ -73,6 +77,8 @@ while True:
             break
 
 cap.release()
+if rec:
+    rec.release()
 cv2.destroyAllWindows()
 with open(out / f"{stem}_frames.csv", "w", newline="") as fh:
     cw = csv.writer(fh)

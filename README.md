@@ -9,10 +9,16 @@ on real drivers, on computer-generated drivers, against the official timing rule
 driver makes the car slow down and stop.
 
 <p align="center">
-  <img src="results/demo_synthetic_sleep.gif" width="360" alt="Synthetic driver closes the eyes; microsleep and sleep warnings fire">
+  <img src="results/demo_live_phone.gif" width="600" alt="Live test with a phone camera: eyes closed, looking down, head turned; warnings fire">
 </p>
-<p align="center"><sub>A computer-generated driver closes the eyes. Top line: what the system sees in each frame.
-Red: the warnings, fired 1.5 s (microsleep) and 3 s (sleep) after the eyes closed.</sub></p>
+<p align="center"><sub>Live test, phone camera, voice-guided: eyes closed → microsleep (1.5 s) and sleep (3 s) warnings; looking down and
+turning the head → distraction warnings (3 s). Green/red: the system's decision per frame. Yellow: what the voice asked for.
+3 of 3 actions detected, 0 false alerts, ~20 fps.</sub></p>
+
+<p align="center">
+  <img src="results/demo_synthetic_sleep.gif" width="300" alt="Synthetic driver closes the eyes; microsleep and sleep warnings fire">
+</p>
+<p align="center"><sub>Same pipeline on a computer-generated driver (Blender), where every label is exact.</sub></p>
 
 ## How it works, in 4 steps
 

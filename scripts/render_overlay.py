@@ -24,7 +24,7 @@ def draw(img, r, t, warns, truth=None):
     else:
         eyes = "unknown" if r["eyes_unknown"] == "1" else "CLOSED" if r["closed"] == "1" else "open"
         put(f"t={t:5.1f}s  system: eyes {eyes}", 22, RED if eyes == "CLOSED" else GREEN)
-        put(f"looking {'AWAY' if r['away'] == '1' else 'at road'}", 22, RED if r["away"] == "1" else GREEN, x=330)
+        put(f"looking {'AWAY' if r['away'] == '1' else 'at road'}", 22, RED if r["away"] == "1" else GREEN, x=int(w * 0.45))
     if truth is not None:
         put(f"truth: {truth}", 46, YELLOW)
     if r["face"] == "1" and r["blink"] != "":
@@ -60,7 +60,7 @@ def main():
     clip = run.rsplit("__", 1)[0]
     events = [(x["kind"], float(x["t_start"]), float(x["t_end"])) for x in read(a.labels) if x["clip"] == clip] if a.labels else None
     cap = cv2.VideoCapture(a.video)
-    fps = cap.get(cv2.CAP_PROP_FPS)
+    fps = (len(fr) - 1) / float(fr[-1]["t"])  # true rate from the timestamps (a live recording's container rate is nominal)
     Path(a.out).mkdir(parents=True, exist_ok=True)
     dst, vw = Path(a.out) / f"{run}.mp4", None
     for r in fr:
