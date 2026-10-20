@@ -48,4 +48,13 @@ labels or flags moments worth a human look. It is **not** the real-time loop. A 
 or more, far slower than the 25 Hz that the on-device DMS loop needs (`src/dms_core.py`, `src/signals.py`).
 
 ## Results
-pending
+2026-10-20, 142 synthetic frames (one per second), free NVIDIA tier. Balanced accuracy; unknown or unparseable answers count as wrong.
+
+| Model | Eyes closed | Looking away | Median s/frame | Errors |
+|---|---|---|---|---|
+| meta/llama-3.2-11b-vision-instruct | 0.59 | 0.46 | 2.7 | 3 |
+| nvidia/nemotron-3.5-super-vl-120b-a12b | 0.59 | 0.63 | 8.6 | 29 |
+
+Not callable on the free tier (HTTP 404 "Function not found for account"): nvidia/cosmos-reason2-8b, google/gemma-3-12b-it,
+google/gemma-3-4b-it, nvidia/vila, microsoft/phi-3-vision-128k-instruct; meta/llama-3.2-90b-vision-instruct timed out.
+Reading: near chance on eyelids, seconds per frame. Fits offline review, not the warning loop. Per-frame CSV: `out/vlm/frames.csv`.

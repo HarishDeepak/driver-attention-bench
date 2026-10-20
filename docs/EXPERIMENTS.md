@@ -73,7 +73,12 @@ Free NVIDIA build.nvidia.com API, zero-shot, 142 frames. DMD is never sent (lice
 
 | Model | Eyes closed (bal. acc.) | Looking away (bal. acc.) | Seconds per frame |
 |---|---|---|---|
-| pending | | | |
+| Llama 3.2 11B Vision | 0.59 | 0.46 | 2.7 |
+| Nemotron VL 120B (reasoning) | 0.59 | 0.63 | 8.6 (29 of 142 unparseable answers) |
+
+For comparison, the real-time pipeline scores ~0.97 per frame on eye state (E4) at ~30 ms. Zero-shot VLMs are near chance on
+eyelids and 100-300x too slow for a 25 Hz warning; their use is offline (labelling help, describing an event afterwards).
+Caveat: 142 frames, synthetic faces, closures behind sunglasses count as "closed" in the labels.
 
 Listed but not callable on the free tier (HTTP 404 "Function not found for account"): Cosmos Reason 2, Gemma 3, VILA, Phi-3 Vision.
 

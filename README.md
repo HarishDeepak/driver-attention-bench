@@ -18,7 +18,7 @@ face video -> MediaPipe -> per-driver calibration -> eyes closed? looking away? 
 | Does it warn on time on exactly labelled synthetic drivers? | 15/18 warnings within ±0.2 s, 0 false alerts; the 3 misses are eyes behind sunglasses, reported as "unknown" on purpose | E1 |
 | On real drivers (DMD dataset, 6 people)? | First run 7/66. Fixing the **measurement** (scoring scope, 20 s calibration, label definition) gave 22/49 (blink score) and 30/49 (EAR) | E2, E3 |
 | Do foundation models (DINOv2, CLIP) see closed eyes better? | No: ~0.97 balanced accuracy per frame, same as the cheap signals. Zero-shot CLIP: 0.70 | E4 |
-| Can a hosted VLM do the job? | Seconds per frame: useful for offline labelling, not for a 25 Hz warning | E5 |
+| Can a hosted VLM do the job? | No: Llama 3.2 Vision and Nemotron VL score ~0.59 on eye state, 3-9 s per frame. Offline use only | E5 |
 | Does driver state matter for the car? | Inattentive driver + standard collision warning crashes at 30 and 50 km/h; warning earlier when the DMS says "inattentive" stops in time | E6 |
 
 ![CARLA collision-warning sweep](docs/img/carla_fcw.png)
