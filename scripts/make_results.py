@@ -187,7 +187,7 @@ def main():
                  RES / "demo_night_nitymed.gif", 19, 39)
     stop = OUT / "videos/carla_escalation_sim.mp4"  # simulated sleeping driver: live_demo.py sim:2-40 --video
     if stop.exists():
-        clip_gif(stop, RES / "demo_carla_safe_stop.gif", 2, 26, fps=4, width=700)
+        clip_gif(stop, RES / "demo_carla_safe_stop.gif", 12, 27, fps=5, width=760)
     if (OUT / "fm/ir_eye_probe.csv").exists():
         ir_chart(OUT / "fm/ir_eye_probe.csv", RES / "infrared_eye_state.png")
     live = ROOT / "data/clips/clip05_live.mp4"  # own face, phone camera, voice-guided take, hand-labelled truth (publishable, unlike DMD)

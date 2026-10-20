@@ -146,6 +146,17 @@ Two fixes made on the way: video frames (30 fps) now all feed the DMS while the 
 tick per frame ran the car 1.5x slow); the Traffic Manager is pinned to the start lane (`tm.set_path`), because a replay showed the
 minimal-risk stop ending at a highway-exit gore instead of in lane. The scene now loads props, street lights, buildings and foliage on top of the ground layer (fits the 6 GB GPU, ~2.7 GB) and adds six Traffic-Manager cars in the neighbouring lanes, so the slow-down and the stop in lane are visible against traffic.
 
+**Minimal-risk manoeuvre, done like the regulation and CARLA's own planner.** UN R157 (automated lane keeping) requires the MRM to
+slow the car "inside the lane" at ≤ 4 m/s², hazard lights from its start, standstill, and no move-off without manual input. On top,
+as some production systems do, the car now moves to the slower lane first when that is safe: at the MRM start CARLA's reference
+`BasicAgent` (LocalPlanner + PID) takes over from the Traffic Manager; each tick it checks, exactly like CARLA's `BehaviorAgent`,
+that the lane marking allows a change to the right, the right lane drives the same way, and no vehicle is in it front or rear; then
+it plans the change with the agent's lane-change path. In the rightmost lane it drives at the lane's right edge (planner lateral
+offset) and stops there. Town04's shoulders are 0.5 m wide, too narrow to stop on. Run: lane −3 → −4, standstill at the right edge,
+hazards and brake lights on, a following car stops behind it. If the lane is occupied, it simply stops in its lane (R157 baseline).
+Bug fixed on the way: the escalation ramp fed the measured speed back every tick, so controller overshoot ratcheted the target
+down (~5 m/s² instead of 2); it is now a time-based ramp from the speed at MRM start (self-check added), measured 2.0 m/s² in CARLA.
+
 **Monte Carlo** (`scripts/dms_safety_mc.py`): distracted driver, stopped car ahead, kinematics and thresholds as the CARLA sweep
 (warning TTC 2.0 s, or 3.0 s when the DMS flags inattention; braking 8 m/s²), reaction time lognormal with median 1.6 s (assumption),
 20,000 drivers per point. The DMS catches the inattention with probability p.

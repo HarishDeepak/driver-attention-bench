@@ -21,6 +21,11 @@ sys.path.insert(0, str(ROOT / "src"))
 from dms_core import Monitor  # noqa: E402
 from escalation import Escalation  # noqa: E402
 
+# CARLA's reference navigation agents ship with the server package (needs shapely + networkx)
+sys.path.append(str(Path(__import__("os").environ.get("CARLA_ROOT", r"C:\carla\CARLA_0.9.16")) / "PythonAPI" / "carla"))
+from agents.navigation.basic_agent import BasicAgent  # noqa: E402
+from agents.navigation.local_planner import RoadOption  # noqa: E402
+
 DT, MAP, CRUISE, AHEAD, STRAIGHT = 0.05, "Town04_Opt", 80.0, 800.0, 200.0  # Town04's longest straight is ~220 m (a highway loop)
 TRAFFIC = [(-1, 40.0), (-1, -30.0), (1, 25.0), (1, -45.0), (-1, 110.0), (1, 90.0)]  # (left -1 / right +1 lane, metres ahead of ego)
 ap = argparse.ArgumentParser()
@@ -60,6 +65,52 @@ def straight_start(m, ahead=STRAIGHT, yaw_tol=3.0):
         if ok:
             return w
     raise SystemExit("no straight road found")
+
+
+class MinimalRiskManoeuvre:
+    """Unresponsive driver: CARLA's reference BasicAgent (LocalPlanner + PID controllers) takes the wheel from the Traffic Manager.
+    UN R157 baseline: slow down inside the lane, hazards on, standstill, no move-off (done by Escalation + the stopped branch).
+    On top, as some production systems do: move one lane to the right when the markings allow it and the target lane is free front and
+    rear (the same checks as CARLA's BehaviorAgent lane change), until the rightmost driving lane; there, stop at the lane's right edge
+    (the planner's lateral offset). Town04's shoulders are 0.5 m wide, too narrow to stop on, so the car stays on the driving lane."""
+
+    def __init__(self, ego, world):
+        self.ego, self.map, self.target_lane = ego, world.get_map(), None
+        self.agent = BasicAgent(ego, target_speed=3.6 * ego.get_velocity().length(), opt_dict={"max_brake": 0.5})
+        self.agent.ignore_traffic_lights(True)
+        self.agent.follow_speed_limits(False)
+        self.agent.set_global_plan(lane_plan(self.map.get_waypoint(ego.get_location()), AHEAD))  # no random turns at splits
+
+    def step(self, target_kmh, vehicles):
+        wp, v = self.map.get_waypoint(self.ego.get_location()), self.ego.get_velocity().length()
+        if self.target_lane is None or wp.lane_id == self.target_lane:  # not in the middle of a lane change
+            self.target_lane = None
+            r = wp.get_right_lane()
+            right_ok = (wp.right_lane_marking.lane_change in (carla.LaneChange.Right, carla.LaneChange.Both) and r is not None
+                        and r.lane_type == carla.LaneType.Driving and r.lane_id * wp.lane_id > 0)
+            if right_ok:
+                busy, _, _ = self.agent._vehicle_obstacle_detected(vehicles, max(15.0, 3 * v), up_angle_th=180, lane_offset=1)
+                path = [] if busy else BasicAgent._generate_lane_change_path(
+                    wp, "right", distance_same_lane=max(v, 2.0), distance_other_lane=AHEAD, lane_change_distance=max(3 * v, 12.0))
+                if path:
+                    self.agent.set_global_plan(path)
+                    self.target_lane = r.lane_id
+            elif r is None or r.lane_type != carla.LaneType.Driving or r.lane_id * wp.lane_id < 0:  # rightmost driving lane
+                self.agent.set_offset(wp.lane_width / 2 - self.ego.bounding_box.extent.y - 0.25)  # + = right of the lane centre
+        self.agent.set_target_speed(target_kmh)
+        return self.agent.run_step()
+
+
+def lane_plan(w, length):
+    """[(waypoint, LANEFOLLOW)] every 2 m along w's own lane, for BasicAgent.set_global_plan."""
+    plan = [(w, RoadOption.LANEFOLLOW)]
+    for _ in range(int(length / 2)):
+        nxt = plan[-1][0].next(2.0)
+        if not nxt:
+            break
+        p = plan[-1][0]
+        plan.append((next((n for n in nxt if n.road_id == p.road_id and n.lane_id == p.lane_id), nxt[0]), RoadOption.LANEFOLLOW))
+    return plan
 
 
 LEVEL_BGR = {"ok": (0, 200, 0), "warning": (0, 200, 255), "slowing": (0, 128, 255), "mrm": (0, 0, 255), "stopped": (0, 0, 160)}
@@ -167,7 +218,7 @@ try:
     world.tick()
 
     mon, esc = Monitor(), Escalation(CRUISE)
-    t_wall, tick, level, frame, trim, pending = time.monotonic(), 0, "ok", None, 0.0, []
+    t_wall, tick, level, frame, trim, pending, mrm = time.monotonic(), 0, "ok", None, 0.0, [], None
     print(f"map {world.get_map().name}, source {a.source}, cruise {CRUISE:.0f} km/h")
     while True:
         if sim:
@@ -192,14 +243,20 @@ try:
         if level == "stopped":
             ego.set_autopilot(False, tm.get_port())  # TM would override the brake
             ego.apply_control(carla.VehicleControl(brake=1.0, hand_brake=True))
+        elif level == "mrm":
+            if mrm is None:  # take over from the TM once, at the start of the manoeuvre
+                ego.set_autopilot(False, tm.get_port())
+                mrm = MinimalRiskManoeuvre(ego, world)
+            ego.apply_control(mrm.step(target, world.get_actors().filter("vehicle.*")))
         else:
             # ponytail: TM holds ~3% under its desired speed; slow integral trim on the command closes that (not a real controller)
             trim = max(-10.0, min(10.0, trim + 0.01 * (target - speed)))
             tm.set_desired_speed(ego, max(target + trim, 0.1))
-        # hazards from mrm on; cleared again if the driver recovers (mrm is latched in Escalation, so only matters for stopped->no)
-        ego.set_light_state(carla.VehicleLightState(
-            carla.VehicleLightState.LeftBlinker | carla.VehicleLightState.RightBlinker if level in ("mrm", "stopped")
-            else carla.VehicleLightState.NONE))
+        # lights are not automatic for a client-controlled car: hazards from the start of the MRM (R157) and kept at standstill,
+        # brake lights whenever the brake is applied, position lights always
+        L = carla.VehicleLightState
+        hazards, braking = level in ("mrm", "stopped"), ego.get_control().brake > 0.05 or level == "stopped"
+        ego.set_light_state(L(int(L.Position) | (int(L.LeftBlinker) | int(L.RightBlinker) if hazards else 0) | (int(L.Brake) if braking else 0)))
         rows.append([round(t, 3), int(closed), int(away), "+".join(warned), level, round(target, 2), round(speed, 2)])
         if not changes or changes[-1][1] != level:
             changes.append((t, level, speed))
@@ -212,7 +269,9 @@ try:
             left = cv2.resize(frame, (480, 360)) if frame is not None else np.full((360, 480, 3), 30, np.uint8)
             txt = [f"t={t:.1f}s  closed={int(closed)} away={int(away)}" + ("  [sim]" if sim else ""),
                    f"level: {level.upper()}", f"target {target:5.1f}  actual {speed:5.1f} km/h",
-                   "warnings: " + (", ".join(sorted(mon.fired)) or "-")]
+                   "warnings: " + (", ".join(sorted(mon.fired)) or "-"),
+                   "lights: " + (" ".join(n for n, on in (("HAZARDS", hazards), ("BRAKE", braking)) if on) or "-"),
+                   "lane: " + (f"{world.get_map().get_waypoint(ego.get_location()).lane_id}" + ("  -> moving right" if mrm and mrm.target_lane else ""))]
             col = {"ok": (0, 200, 0), "warning": (0, 200, 255), "slowing": (0, 128, 255)}.get(level, (0, 0, 255))
             for i, line in enumerate(txt):
                 cv2.putText(left, line, (8, 25 + 26 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.55, col if i == 1 else (255, 255, 255), 2)

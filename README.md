@@ -46,8 +46,9 @@ Eyes close → sleep warning → DMS level WARNING in the car. The driver looks 
   <img src="results/demo_carla_safe_stop.gif" width="420" alt="CARLA: slowing, minimal-risk manoeuvre, stop in lane">
   <img src="results/live_escalation.png" width="440" alt="CARLA ego speed during escalation">
 </p>
-<p align="center"><sub>If the driver stays asleep (simulated driver, eyes closed from 2 s): warning 3.5 s, slowing from 10 s,
-safe-stop manoeuvre from 15 s, standstill at 22.5 s.</sub></p>
+<p align="center"><sub>If the driver stays asleep (simulated driver, eyes closed from 2 s): warning 3.5 s, slowing to 60 km/h from 10 s,
+minimal-risk manoeuvre from 15 s (hazards on, CARLA's planner checks the right lane is free, moves one lane right, brakes at
+2 m/s² to the lane's right edge), standstill at 23.2 s.</sub></p>
 
 ## What I found
 

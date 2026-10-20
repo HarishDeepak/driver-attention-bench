@@ -27,8 +27,12 @@ class Escalation:
             self.level, self.target = "ok", self.cruise
         elif (self.closed0 is not None and t - self.closed0 >= UNRESP_CLOSED_S) or \
                 (self.away0 is not None and t - self.away0 >= UNRESP_AWAY_S) or self.level == "mrm":
+            if self.level != "mrm":  # start the ramp from the current speed, once
+                self.target = min(self.target, speed_kmh)
             self.level = "mrm"
-            self.target = max(0.0, min(self.target, speed_kmh) - MRM_DECEL * 3.6 * dt)
+            # time-based ramp: feeding the measured speed back every tick let any controller overshoot ratchet the target down
+            # (seen in CARLA: ~5 m/s2 instead of 2)
+            self.target = max(0.0, self.target - MRM_DECEL * 3.6 * dt)
             if self.target == 0.0 and speed_kmh < 1.0:
                 self.level = "stopped"
         elif self.inatt0 is not None and t - self.inatt0 >= SLOW_S and self.level in ("warning", "slowing"):
@@ -57,6 +61,13 @@ if __name__ == "__main__":
     unresp = sim(closed_until=1e9, total=40)
     assert [l for _, l in unresp] == ["ok", "warning", "slowing", "mrm", "stopped"], unresp
     assert dict((l, t) for t, l in unresp)["mrm"] == 13.0
+    # the MRM ramp is 2 m/s2 even if the car brakes harder than asked (speed below target must not pull the target down)
+    e, m = Escalation(), Monitor()
+    for i in range(int(13 * 20) + 1):
+        e.step(i / 20, True, False, m.step(i / 20, True, False), 60.0)
+    lvl0, tg0 = e.level, e.target
+    _, tg1 = e.step(13.0 + 1.0, True, False, [], 30.0)  # 1 s later, car already far slower than the target
+    assert lvl0 == "mrm" and abs((tg0 - tg1) - 2.0 * 3.6 * 1.0) < 1e-6, (lvl0, tg0, tg1)
     recover = sim(closed_until=5.0, total=10)
     assert [l for _, l in recover] == ["ok", "warning", "ok"], recover
     print("escalation OK", unresp, recover)
