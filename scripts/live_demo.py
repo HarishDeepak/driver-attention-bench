@@ -33,6 +33,8 @@ ap.add_argument("source", help="camera index, video file or sim:A-B (eyes closed
 ap.add_argument("--clahe", action="store_true")
 ap.add_argument("--headless", action="store_true")
 ap.add_argument("--seconds", type=float, default=60.0)
+ap.add_argument("--eye", choices=["blend", "ear"], default="blend", help="eye signal (ear is better at night, E11)")
+ap.add_argument("--calib-s", type=float, default=3.0, help="calibration window (s)")
 ap.add_argument("--video", help="save the window view (face + chase camera) to this .mp4; works with --headless")
 a = ap.parse_args()
 
@@ -44,7 +46,7 @@ else:
     from signals import Classifier, FaceSignals
     cap = cv2.VideoCapture(int(a.source) if live else a.source)
     assert cap.isOpened(), f"cannot open {a.source}"
-    fs, clf = FaceSignals(use_clahe=a.clahe), Classifier(calib_s=3.0)
+    fs, clf = FaceSignals(use_clahe=a.clahe), Classifier(calib_s=a.calib_s, eye=a.eye)
 
 
 def straight_start(m, ahead=STRAIGHT, yaw_tol=3.0):

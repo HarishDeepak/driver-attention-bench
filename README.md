@@ -72,7 +72,7 @@ minimal-risk manoeuvre from 15 s (hazards on, CARLA's planner checks the right l
   <img src="results/demo_night_nitymed.gif" width="560" alt="Night-time driver: microsleep and sleep warnings">
 </p>
 <p align="center"><sub>Night driving, real car (NITYMED, CC BY 4.0, Petrellis et al.): EAR with robust calibration; yellow = hand-labelled truth.</sub></p>
-<p align="center"><a href="results/videos/night_nitymed_P1042793.mp4?raw=true">⬇ full video, 2 min (MP4 download)</a> · GIF above is a short excerpt</p>
+<p align="center"><a href="results/videos/night_nitymed_P1042793.mp4?raw=true">⬇ full video, 2 min (MP4 download)</a> · <a href="results/videos/night_driver_to_carla.mp4?raw=true">⬇ same driver driving the CARLA car (MP4)</a>: a warning at each microsleep cluster; no slow-down, because he always reopened his eyes within 8 s (escalation needs continuous inattention)</p>
 3. **Driver state changes the crash outcome, and detector accuracy decides by how much.** In CARLA, a distracted driver with a
    standard collision warning crashes at 30 and 50 km/h; warning earlier because the camera flags the distraction avoids both.
    A Monte Carlo over driver reaction times then plugs in the accuracy measured on real drivers: at 50 km/h the crash rate falls

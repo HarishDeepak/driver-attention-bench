@@ -174,6 +174,7 @@ FULL = {  # full-length videos next to the short README GIFs (all publishable: o
     "videos/carla_escalation_sim.mp4": "carla_minimal_risk_manoeuvre.mp4",
     "videos/male_P1042793_720__clean_ear.mp4": "night_nitymed_P1042793.mp4",
     "videos/synth02_sleep__clean.mp4": "synthetic_sleep.mp4",
+    "videos/carla_night_nitymed.mp4": "night_driver_to_carla.mp4",
 }
 
 
