@@ -1,0 +1,12 @@
+# Prompt for scripts/cosmos_transfer.py. Fields follow the NIM request schema in docs/details/COSMOS.md; control paths are relative to this file's cwd.
+prompt = "A dashcam view of a multi-lane highway at dusk in steady rain. The road is wet and reflective, spray rises behind the cars, low grey clouds, headlights on. A red car ahead in the lane, trees and concrete barriers along the roadside. Photorealistic, high fidelity, structure of the scene maintained, vehicles maintained."
+video = "out/cosmos/rgb.mp4"
+resolution = "720"   # NIM doc lists 256 / 480 / 512 / 720 [docs.nvidia.com/nim/cosmos/latest/introduction.html]
+
+[depth]
+control = "out/cosmos/depth.mp4"
+control_weight = 0.5
+
+[seg]
+control = "out/cosmos/semantic_segmentation.mp4"
+control_weight = 0.8
