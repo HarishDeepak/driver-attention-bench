@@ -1,20 +1,59 @@
 # driver-attention-bench
 
-A test bench for camera-based **driver monitoring (DMS)**. It checks whether a real-time pipeline warns on time under the
-**Euro NCAP SD-202** test procedure, measures where it fails on real and synthetic drivers, and closes the loop in **CARLA**:
-the driver state slows the car and brings it to a minimal-risk stop.
+**New cars in Europe must watch the driver.** A small camera on the dashboard checks whether the driver's eyes are closed or
+looking away from the road, and the car must warn in time. Euro NCAP, the European crash-test rating, tests this with fixed rules:
+eyes closed for 3 seconds = "sleep", and the warning has to come within 0.2 seconds of that moment.
 
-Personal project. Small datasets, simplified vehicle models, no product claims.
+This project builds such a driver monitor from open tools and then **tests it the way a car maker's validation team would**:
+on real drivers, on computer-generated drivers, against the official timing rules, and in a driving simulator where a sleeping
+driver makes the car slow down and stop.
 
 <p align="center">
   <img src="results/demo_synthetic_sleep.gif" width="360" alt="Synthetic driver closes the eyes; microsleep and sleep warnings fire">
-  &nbsp;
-  <img src="results/live_escalation.png" width="460" alt="CARLA ego speed during escalation">
 </p>
-<p align="center"><sub>Left: synthetic driver, per-frame decision and SD-202 warnings. Right: same state driving the CARLA ego car
-(warning 3.5 s, slowing 10 s, minimal-risk stop 15 s, standstill 22.5 s; the first 2 s are the Traffic Manager settling).</sub></p>
+<p align="center"><sub>A computer-generated driver closes the eyes. Top line: what the system sees in each frame.
+Red: the warnings, fired 1.5 s (microsleep) and 3 s (sleep) after the eyes closed.</sub></p>
 
-## Results
+## How it works, in 4 steps
+
+```mermaid
+flowchart LR
+    A["1 · Watch<br/>camera video of the driver"] --> B["2 · Measure<br/>eyelid opening, head angle,<br/>eye direction (MediaPipe)"]
+    B --> C["3 · Decide<br/>eyes closed? looking away?<br/>for how long? → warning"]
+    C --> D["4 · Act<br/>warn, slow the car,<br/>stop it safely (CARLA)"]
+    C --> E["Test<br/>compare every warning with the<br/>true timing → score + report"]
+```
+
+1. **Watch.** Video of a driver: real drivers from the DMD research dataset, rendered drivers from Blender, or a live camera.
+2. **Measure.** Google's MediaPipe finds 478 points on the face and reports how open the eyes are and where the head points.
+3. **Decide.** The system first learns this driver's normal face (calibration), then flags *eyes closed* or *looking away*.
+   Timers turn that into the three official warnings: microsleep (1.5 s), sleep (3 s), distraction (3 s).
+4. **Act.** In the CARLA driving simulator, a driver who stays asleep triggers warning → slow down → stop in lane with hazard lights.
+
+<p align="center">
+  <img src="results/live_escalation.png" width="620" alt="CARLA ego speed during escalation">
+</p>
+<p align="center"><sub>Driver falls asleep at 2 s: warning at 3.5 s, car slows from 10 s, safe-stop manoeuvre from 15 s, standstill at 22.5 s.</sub></p>
+
+## What I found
+
+1. **Most of the early "failures" were test-setup mistakes, not detector mistakes.** On real drivers the first run caught only
+   7 of 66 events in time. Scoring only where the dataset has labels, calibrating over 20 s instead of 2 s, and defining
+   "closed" as lids actually shut raised that to 30 of 49, without changing the detector.
+2. **Big AI models did not beat the simple signals.** DINOv2 and CLIP (foundation models) recognised closed eyes about as well as
+   the simple eyelid measurement (≈ 97 % per frame). Large chat-style vision models (VLMs) were close to guessing and took
+   3-9 seconds per frame. For a warning that must come within 0.2 s, the small fast model is the right tool.
+3. **Driver state changes the crash outcome.** In CARLA, a distracted driver with a standard collision warning crashes at 30 and
+   50 km/h. Warning earlier because the camera knows the driver is distracted avoids both crashes.
+
+<p align="center">
+  <img src="results/dmd_steps.png" width="49%" alt="DMD hit rate per measurement fix">
+  <img src="results/carla_fcw.png" width="49%" alt="CARLA collision-warning sweep">
+</p>
+
+Personal project: small datasets, simplified car physics, no product claims.
+
+## Results in numbers
 
 | Question | Answer | Details |
 |---|---|---|
@@ -29,7 +68,7 @@ Personal project. Small datasets, simplified vehicle models, no product claims.
   <img src="results/carla_fcw.png" width="49%" alt="CARLA collision-warning sweep">
 </p>
 
-## Architecture
+## Architecture (technical)
 
 ```mermaid
 flowchart LR
