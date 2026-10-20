@@ -53,22 +53,9 @@ flowchart LR
 
 Personal project: small datasets, simplified car physics, no product claims.
 
-## Results in numbers
+Every number, including what did not work: [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md). How each warning is scored: [`docs/METHOD.md`](docs/METHOD.md).
 
-| Question | Answer | Details |
-|---|---|---|
-| Does it warn on time on exactly labelled synthetic drivers? | 15/18 within ±0.2 s, 0 false alerts. The 3 misses are eyes behind dark sunglasses, reported as *unknown* on purpose | [E1](docs/EXPERIMENTS.md#e1-synthetic-drivers-blender-6-clips-exact-labels) |
-| On real drivers (DMD, 6 people)? | First run 7/66. Fixing the **measurement** (scoring scope, 20 s calibration, label definition) gave 22/49 (blink score) and 30/49 (EAR) | [E2, E3](docs/EXPERIMENTS.md#e2-real-drivers-dmd-from-first-run-to-the-fixed-measurement) |
-| Do foundation models see closed eyes better? | No. DINOv2 / CLIP linear probes ≈ 0.97 balanced accuracy per frame, same as the cheap signals; zero-shot CLIP 0.70 | [E4](docs/EXPERIMENTS.md#e4-foundation-models-for-eye-state-dmd-per-frame-leave-one-subject-out) |
-| Can a hosted VLM do the job? | No. Llama 3.2 Vision / Nemotron VL ≈ 0.59 on eye state at 3-9 s per frame: offline use only | [E5](docs/EXPERIMENTS.md#e5-hosted-vision-language-models-vlms-on-synthetic-frames) |
-| Does driver state matter for the car? | Inattentive driver + standard collision warning crashes at 30 and 50 km/h; warning earlier when the DMS reports inattention stops in time | [E6](docs/EXPERIMENTS.md#e6-carla-why-driver-state-matters-for-the-car) |
-
-<p align="center">
-  <img src="results/dmd_steps.png" width="49%" alt="DMD hit rate per measurement fix">
-  <img src="results/carla_fcw.png" width="49%" alt="CARLA collision-warning sweep">
-</p>
-
-## Architecture (technical)
+## Under the hood
 
 ```mermaid
 flowchart LR
@@ -134,15 +121,6 @@ stateDiagram-v2
     slowing --> ok: attentive 2 s
     mrm --> ok: attentive 2 s
 ```
-
-## How it is measured
-
-- **Rules:** microsleep 1.5 s, sleep 3 s, long distraction 3 s; a warning is on time within **±0.2 s** (SD-202 v1.2).
-- **Outcomes:** hit / early / late / miss per labelled event, false alerts per scored hour, **Wilson 95 %** intervals for small counts.
-- **No tuning on test data:** knobs are chosen **leave-one-subject-out** (`scripts/replay.py --loso`).
-- **Scope:** a kind is only scored where the dataset labels it; events during calibration are excluded.
-
-Full method: [`docs/METHOD.md`](docs/METHOD.md) · all experiments, including what did not work: [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md).
 
 ## Repository layout
 
