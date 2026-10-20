@@ -178,12 +178,12 @@ def main():
     if live:
         live_escalation(live[-1], RES / "live_escalation.png")
     cosmos_panel(OUT / "cosmos", RES / "carla_control_videos.png")
-    sbs = OUT / "videos/live_20261020_220639_carla.mp4"  # take 5 (own face) driving the CARLA ego: scripts/live_demo.py + carla_video.py
+    sbs = OUT / "videos/carla_real_face_take5.mp4"  # take 5 (own face) driving the CARLA ego: live_demo.py <clip> --video
     if sbs.exists():
-        clip_gif(sbs, RES / "demo_face_to_carla.gif", 22, 34)
-    stop = OUT / "videos/live_20261020_221211_carla.mp4"  # simulated sleeping driver, full escalation to a stop in lane
+        clip_gif(sbs, RES / "demo_face_to_carla.gif", 22, 40, fps=5)
+    stop = OUT / "videos/carla_escalation_sim.mp4"  # simulated sleeping driver: live_demo.py sim:2-40 --video
     if stop.exists():
-        clip_gif(stop, RES / "demo_carla_safe_stop.gif", 8, 25, fps=4, width=560)
+        clip_gif(stop, RES / "demo_carla_safe_stop.gif", 2, 26, fps=4, width=700)
     if (OUT / "fm/ir_eye_probe.csv").exists():
         ir_chart(OUT / "fm/ir_eye_probe.csv", RES / "infrared_eye_state.png")
     live = ROOT / "data/clips/clip05_live.mp4"  # own face, phone camera, voice-guided take, hand-labelled truth (publishable, unlike DMD)

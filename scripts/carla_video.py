@@ -25,7 +25,9 @@ def main():
     rows = list(csv.DictReader(open(min(p for p in (ROOT / "out").glob("live_*.csv") if p.stem >= log.stem))))
     client = carla.Client("localhost", 2000)
     client.set_timeout(60)
-    world = client.load_world(MAP, map_layers=carla.MapLayer.Ground)  # ponytail: ground-only, full Town04 crashes the 6 GB GPU
+    world = client.load_world(MAP, map_layers=carla.MapLayer.Ground)  # ponytail: full Town04 at once crashes the 6 GB GPU
+    for layer in (carla.MapLayer.Props, carla.MapLayer.StreetLights, carla.MapLayer.Buildings, carla.MapLayer.Foliage):
+        world.load_map_layer(layer)
     s = world.get_settings()
     s.synchronous_mode, s.fixed_delta_seconds = True, DT
     world.apply_settings(s)
@@ -36,11 +38,12 @@ def main():
         if vehicles:
             break
     assert vehicles, "replay produced no vehicle"
-    ego = max(vehicles, key=lambda a: a.id)  # the replayed ego
+    hero = [v for v in vehicles if v.attributes.get("role_name") == "hero"]
+    ego = hero[0] if hero else min(vehicles, key=lambda a: a.id)  # the replayed ego (older logs: the first vehicle spawned)
     bp = world.get_blueprint_library().find("sensor.camera.rgb")
     bp.set_attribute("image_size_x", str(W))
     bp.set_attribute("image_size_y", str(H))
-    cam = world.spawn_actor(bp, carla.Transform(carla.Location(x=-7, z=3), carla.Rotation(pitch=-12)), attach_to=ego)
+    cam = world.spawn_actor(bp, carla.Transform(carla.Location(x=-10, z=4.5), carla.Rotation(pitch=-14)), attach_to=ego)
     q = queue.Queue()
     cam.listen(q.put)
     dst = ROOT / "out" / "videos" / f"{log.stem}_carla.mp4"

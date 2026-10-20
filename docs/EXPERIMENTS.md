@@ -141,10 +141,10 @@ frames, subsampled. Details: `details/FOUNDATION.md`.
 
 **Real face drives the car.** `scripts/live_demo.py data/clips/clip05_live.mp4` feeds the recorded phone take (E8) into the CARLA
 escalation: warning at the eye closure and at the head turn, back to OK each time because the driver looked back within 8 s.
-`scripts/carla_video.py` replays the CARLA recorder log with a chase camera next to the face overlay (`results/demo_face_to_carla.gif`).
+`live_demo.py <clip> --video out.mp4` records the face panel and a chase camera during the run (CARLA's sync sensor-queue pattern; `results/demo_face_to_carla.gif`). A first version rendered from recorder replays instead: replays end with their vehicles on autopilot, those leftovers got recorded into later runs, and the camera followed a wrong car; now every run clears leftover vehicles (`apply_batch_sync`) and no replay is needed.
 Two fixes made on the way: video frames (30 fps) now all feed the DMS while the car steps at the 20 Hz sim rate (before, one sim
 tick per frame ran the car 1.5x slow); the Traffic Manager is pinned to the start lane (`tm.set_path`), because a replay showed the
-minimal-risk stop ending at a highway-exit gore instead of in lane.
+minimal-risk stop ending at a highway-exit gore instead of in lane. The scene now loads props, street lights, buildings and foliage on top of the ground layer (fits the 6 GB GPU, ~2.7 GB) and adds six Traffic-Manager cars in the neighbouring lanes, so the slow-down and the stop in lane are visible against traffic.
 
 **Monte Carlo** (`scripts/dms_safety_mc.py`): distracted driver, stopped car ahead, kinematics and thresholds as the CARLA sweep
 (warning TTC 2.0 s, or 3.0 s when the DMS flags inattention; braking 8 m/s²), reaction time lognormal with median 1.6 s (assumption),
