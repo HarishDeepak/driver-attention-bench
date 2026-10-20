@@ -182,9 +182,11 @@ expected warnings). Hand labels are ±0.3 s, so a hit here = warning between the
 | EAR, median calibration | 10/27, 0 | 30/49, 14 | 15/18, 0 | 3/4, 2 |
 | **EAR, robust calibration** | **16/27, 1** | 31/49, 17 | 15/18, 0 | 3/4, 2 |
 
-Reading: robust calibration costs nothing on any other dataset and helps at night, so it is now the default. Per-driver calibration
-is not useless: a fixed EAR threshold collapses on DMD (eye shapes differ); a fixed blink threshold helps at night but adds false
-alerts in daylight. No single eye signal wins everywhere: EAR is better on DMD and at night, the blink score on the daytime phone
+Reading: robust calibration costs nothing on any other dataset and helps at night, so it is now the default. A well-chosen fixed
+threshold is a real alternative: EAR fixed at 0.15 gives 31/49 on DMD (17 false alerts) vs 30/49 (14) calibrated, and the
+leave-one-driver-out choice still prefers calibration for its fewer false alerts; a fixed blink threshold helps at night but adds
+false alerts in daylight and on the phone take. (An earlier draft said a fixed EAR threshold "collapses" on DMD: that came from
+applying blink-scale thresholds to EAR and was wrong.) No single eye signal wins everywhere: EAR is better on DMD and at night, the blink score on the daytime phone
 take. Default stays blink score; EAR (`--eye ear`) is the recommended setting for night and real-car footage.
 
 ## E7. Speed
