@@ -73,9 +73,9 @@ Methods are organised in tiers, the way production DMS work splits them; every t
 ```mermaid
 flowchart LR
     SRC["run_clip / live_demo CSV<br/>or simulated driver"] --> PUB(["dms_state_pub<br/>(rclpy node)"])
-    PUB -- "/dms/state<br/>std_msgs/String · JSON" --> BAG[("rosbag2 · mcap")]
-    PUB -- "/dms/state" --> ECHO(["ros2 topic echo / any HMI node"])
-    PUB -. "planned" .-> BR(["CARLA client node<br/>(not written)"])
+    PUB -->|"/dms/state (std_msgs/String, JSON)"| BAG[("rosbag2 · mcap")]
+    PUB -->|"/dms/state"| ECHO(["ros2 topic echo / any HMI node"])
+    PUB -.->|planned| BR(["CARLA client node<br/>(not written)"])
 ```
 
 Message: `{"t", "closed", "away", "warnings", "level"}` at the frame rate. Runs on ROS 2 Jazzy in WSL Ubuntu 24.04.
