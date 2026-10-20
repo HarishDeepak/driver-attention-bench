@@ -37,7 +37,7 @@ else:
     from signals import Classifier, FaceSignals
     cap = cv2.VideoCapture(int(a.source) if live else a.source)
     assert cap.isOpened(), f"cannot open {a.source}"
-    fs, clf = FaceSignals(use_clahe=a.clahe), Classifier()
+    fs, clf = FaceSignals(use_clahe=a.clahe), Classifier(calib_s=3.0)
 
 
 def straight_start(m):
@@ -82,6 +82,16 @@ try:
     tm.ignore_lights_percentage(ego, 100)
     tm.distance_to_leading_vehicle(ego, 5.0)
     tm.set_desired_speed(ego, CRUISE)
+    # pin the TM to the start lane: at highway splits it otherwise picks a random branch (seen in a replay: the minimal-risk
+    # stop ended at an exit gore instead of in lane)
+    path, w = [], wp
+    for _ in range(int(AHEAD / 10)):
+        nxt = w.next(10.0)
+        if not nxt:
+            break
+        w = next((n for n in nxt if n.road_id == w.road_id and n.lane_id == w.lane_id), nxt[0])
+        path.append(w.transform.location)
+    tm.set_path(ego, path)
     chase = None
     if not a.headless:
         bp = world.get_blueprint_library().find("sensor.camera.rgb")
@@ -93,7 +103,7 @@ try:
     world.tick()
 
     mon, esc = Monitor(), Escalation(CRUISE)
-    t_wall, tick, level, frame, trim = time.monotonic(), 0, "ok", None, 0.0
+    t_wall, tick, level, frame, trim, pending = time.monotonic(), 0, "ok", None, 0.0, []
     print(f"map {world.get_map().name}, source {a.source}, cruise {CRUISE:.0f} km/h")
     while True:
         if sim:
@@ -106,11 +116,14 @@ try:
             t = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000 if not live else tick * DT
             st = clf.step(t, fs(frame, t * 1000), fs.fb)
             closed, away = (bool(st[0]), st[1]) if st else (False, False)  # calibrating: assume attentive; eyes unknown (None) = not closed
+            if not live and t < tick * DT:  # video (25-30 fps) faster than the 20 Hz sim: every frame feeds the DMS, the car steps at sim rate
+                pending += mon.step(t, closed, away)
+                continue
         if t > a.seconds:
             break
         v = ego.get_velocity()
         speed = math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2) * 3.6
-        warned = mon.step(t, closed, away)
+        warned, pending = pending + mon.step(t, closed, away), []
         level, target = esc.step(t, closed, away, warned, speed)
         if level == "stopped":
             ego.set_autopilot(False, tm.get_port())  # TM would override the brake

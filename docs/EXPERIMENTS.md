@@ -137,11 +137,37 @@ reaches 0.93-0.94 on people it never saw, and low light barely matters in IR; gl
 This is why production DMS cameras are IR and why IR training data matters. Caveats: cropped eyes, not a car DMS camera, single
 frames, subsampled. Details: `details/FOUNDATION.md`.
 
+## E10. CARLA with real data, and from detector accuracy to crash outcomes
+
+**Real face drives the car.** `scripts/live_demo.py data/clips/clip05_live.mp4` feeds the recorded phone take (E8) into the CARLA
+escalation: warning at the eye closure and at the head turn, back to OK each time because the driver looked back within 8 s.
+`scripts/carla_video.py` replays the CARLA recorder log with a chase camera next to the face overlay (`results/demo_face_to_carla.gif`).
+Two fixes made on the way: video frames (30 fps) now all feed the DMS while the car steps at the 20 Hz sim rate (before, one sim
+tick per frame ran the car 1.5x slow); the Traffic Manager is pinned to the start lane (`tm.set_path`), because a replay showed the
+minimal-risk stop ending at a highway-exit gore instead of in lane.
+
+**Monte Carlo** (`scripts/dms_safety_mc.py`): distracted driver, stopped car ahead, kinematics and thresholds as the CARLA sweep
+(warning TTC 2.0 s, or 3.0 s when the DMS flags inattention; braking 8 m/s²), reaction time lognormal with median 1.6 s (assumption),
+20,000 drivers per point. The DMS catches the inattention with probability p.
+
+| Speed | No DMS: crash / mean impact | DMS, p = 0.61 (DMD, EAR arm): crash / impact | Ideal DMS, p = 1: crash / impact |
+|---|---|---|---|
+| 30 km/h | 60 % / 14 km/h | 28 % / 6 km/h | 7 % / 2 km/h |
+| 50 km/h | 87 % / 33 km/h | 44 % / 16 km/h | 17 % / 5 km/h |
+| 80 km/h | 100 % / 65 km/h | 68 % / 38 km/h | 49 % / 20 km/h |
+
+The kinematic model reproduces the CARLA sweep case (30 km/h, fixed warning: 14.2 km/h impact). p = 0.61 is a conservative proxy
+(event-level hit rate within ±0.2 s on DMD); a distraction caught 0.5 s late would still move the warning earlier. The result is a
+model, but it links the perception metric to a vehicle-level outcome, which is what a requirement for DMS accuracy needs.
+
+![DMS safety Monte Carlo](../results/dms_safety_mc.png)
+
 ## E7. Speed
 
 | Part | Speed |
 |---|---|
 | default pipeline (MediaPipe, CPU) | ~35 fps Windows / ~58 fps WSL |
+| MediaPipe Face Landmarker alone, WSL, CPU (XNNPACK) vs GPU delegate | CPU 86 fps; GPU via OpenGL ES → Mesa D3D12 → RTX 4050: 6.4 fps (translation layers + frame copies dwarf a tiny model); software OpenGL: fails |
 | with MobileGaze | ~12-17 fps (below the 25 Hz SD-202 video rate) |
 | DINOv2 / CLIP on two eye crops (GPU) | 3.5-4.5 ms per frame |
 | hosted VLM | seconds per frame: offline use only |

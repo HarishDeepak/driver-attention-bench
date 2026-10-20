@@ -151,6 +151,23 @@ def ir_chart(src, path):
     fig.savefig(path, dpi=130)
 
 
+def clip_gif(video, path, t0, t1, fps=6, width=760):
+    """[t0, t1] s of an already-rendered video (e.g. the face + CARLA side-by-side) -> GIF with one shared palette."""
+    cap = cv2.VideoCapture(str(video))
+    src, imgs, i = cap.get(cv2.CAP_PROP_FPS), [], 0
+    while True:
+        ok, img = cap.read()
+        if not ok or i / src > t1:
+            break
+        if i / src >= t0 and i % max(1, round(src / fps)) == 0:
+            img = cv2.resize(img, (width, round(img.shape[0] * width / img.shape[1])), interpolation=cv2.INTER_AREA)
+            imgs.append(Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)))
+        i += 1
+    pal = imgs[len(imgs) // 2].quantize(192)
+    imgs = [im.quantize(palette=pal, dither=Image.Dither.NONE) for im in imgs]
+    imgs[0].save(path, save_all=True, append_images=imgs[1:], duration=1000 // fps, loop=0, optimize=True)
+
+
 def main():
     RES.mkdir(exist_ok=True)
     for src, dst in COPY.items():
@@ -161,6 +178,9 @@ def main():
     if live:
         live_escalation(live[-1], RES / "live_escalation.png")
     cosmos_panel(OUT / "cosmos", RES / "carla_control_videos.png")
+    sbs = OUT / "videos/live_20261020_220639_carla.mp4"  # take 5 (own face) driving the CARLA ego: scripts/live_demo.py + carla_video.py
+    if sbs.exists():
+        clip_gif(sbs, RES / "demo_face_to_carla.gif", 22, 34)
     if (OUT / "fm/ir_eye_probe.csv").exists():
         ir_chart(OUT / "fm/ir_eye_probe.csv", RES / "infrared_eye_state.png")
     live = ROOT / "data/clips/clip05_live.mp4"  # own face, phone camera, voice-guided take, hand-labelled truth (publishable, unlike DMD)

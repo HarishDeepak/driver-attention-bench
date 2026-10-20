@@ -37,9 +37,16 @@ flowchart LR
 4. **Act.** In the CARLA driving simulator, a driver who stays asleep triggers warning → slow down → stop in lane with hazard lights.
 
 <p align="center">
+  <img src="results/demo_face_to_carla.gif" width="760" alt="Recorded face drives the CARLA car: eyes close, sleep warning, DMS level WARNING">
+</p>
+<p align="center"><sub>Closed loop with real data: the recorded phone take (left, live detection) drives the CARLA ego car (right).
+Eyes close → sleep warning → DMS level WARNING in the car. The driver looks back within 8 s, so it never escalates further.</sub></p>
+
+<p align="center">
   <img src="results/live_escalation.png" width="620" alt="CARLA ego speed during escalation">
 </p>
-<p align="center"><sub>Driver falls asleep at 2 s: warning at 3.5 s, car slows from 10 s, safe-stop manoeuvre from 15 s, standstill at 22.5 s.</sub></p>
+<p align="center"><sub>If the driver stays asleep (simulated driver, eyes closed from 2 s): warning 3.5 s, slowing from 10 s,
+safe-stop manoeuvre from 15 s, standstill at 22.5 s.</sub></p>
 
 ## What I found
 
@@ -51,12 +58,17 @@ flowchart LR
    3-9 seconds per frame. For a warning that must come within 0.2 s, the small fast model is the right tool.
    On **real infrared** eye images (night-time cameras), an eye model trained on daylight video dropped to 0.69-0.76; trained on
    infrared it reached 0.93-0.94 on unseen people. Day-to-night is a real gap, which is why car DMS cameras are infrared.
-3. **Driver state changes the crash outcome.** In CARLA, a distracted driver with a standard collision warning crashes at 30 and
-   50 km/h. Warning earlier because the camera knows the driver is distracted avoids both crashes.
+3. **Driver state changes the crash outcome, and detector accuracy decides by how much.** In CARLA, a distracted driver with a
+   standard collision warning crashes at 30 and 50 km/h; warning earlier because the camera flags the distraction avoids both.
+   A Monte Carlo over driver reaction times then plugs in the accuracy measured on real drivers: at 50 km/h the crash rate falls
+   from 87 % (no DMS) to 44 % (our measured DMS) and 17 % (ideal DMS). Reaction times are an assumption; the chain is the point.
 
 <p align="center">
   <img src="results/dmd_steps.png" width="49%" alt="DMD hit rate per measurement fix">
   <img src="results/carla_fcw.png" width="49%" alt="CARLA collision-warning sweep">
+</p>
+<p align="center">
+  <img src="results/dms_safety_mc.png" width="90%" alt="Crash probability vs speed for no DMS, measured DMS and ideal DMS">
 </p>
 
 Personal project: small datasets, simplified car physics, no product claims.

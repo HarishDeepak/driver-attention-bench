@@ -1,0 +1,25 @@
+case,p_detect,speed_kmh,crash_prob,mean_impact_kmh
+no DMS (fixed warning),0.0,30,0.603,13.99
+no DMS (fixed warning),0.0,40,0.7496,22.4
+no DMS (fixed warning),0.0,50,0.874,32.57
+no DMS (fixed warning),0.0,60,0.9568,43.59
+no DMS (fixed warning),0.0,70,0.9909,54.73
+no DMS (fixed warning),0.0,80,0.9994,65.42
+no DMS (fixed warning),0.0,90,1.0,75.85
+no DMS (fixed warning),0.0,100,1.0,86.08
+"DMS, measured on DMD (p = 0.61)",0.61,30,0.2806,6.4
+"DMS, measured on DMD (p = 0.61)",0.61,40,0.3621,10.49
+"DMS, measured on DMD (p = 0.61)",0.61,50,0.4436,15.78
+"DMS, measured on DMD (p = 0.61)",0.61,60,0.5344,22.43
+"DMS, measured on DMD (p = 0.61)",0.61,70,0.6092,29.75
+"DMS, measured on DMD (p = 0.61)",0.61,80,0.6822,37.82
+"DMS, measured on DMD (p = 0.61)",0.61,90,0.778,47.82
+"DMS, measured on DMD (p = 0.61)",0.61,100,0.8718,59.42
+ideal DMS (p = 1.0),1.0,30,0.0734,1.5
+ideal DMS (p = 1.0),1.0,40,0.1102,2.79
+ideal DMS (p = 1.0),1.0,50,0.167,4.9
+ideal DMS (p = 1.0),1.0,60,0.2502,8.21
+ideal DMS (p = 1.0),1.0,70,0.3491,13.06
+ideal DMS (p = 1.0),1.0,80,0.4916,20.42
+ideal DMS (p = 1.0),1.0,90,0.6397,30.05
+ideal DMS (p = 1.0),1.0,100,0.7877,41.49
