@@ -31,7 +31,7 @@ DMD_DIM = {"dino": 384, "clip": 512}  # per eye: DINOv2-small CLS and CLIP image
 NAME = re.compile(r"s(\d{4})_(\d+)_([01])_([01])_([01])_([012])_([01])_(\d{2})\.png")
 SUBSETS = {"lighting=bad": ("lighting", 0), "lighting=good": ("lighting", 1), "glasses=yes": ("glasses", 1),
            "glasses=no": ("glasses", 0), "reflections=none": ("reflections", 0), "reflections=small": ("reflections", 1),
-           "reflections=big": ("reflections", 2), "sensor=01": ("sensor", 1), "sensor=02": ("sensor", 2)}
+           "reflections=big": ("reflections", 2), "sensor=01": ("sensor", 1), "sensor=02": ("sensor", 2), "sensor=03": ("sensor", 3)}
 
 
 def parse(name):
