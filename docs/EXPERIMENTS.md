@@ -200,6 +200,13 @@ false alerts in daylight and on the phone take. (An earlier draft said a fixed E
 applying blink-scale thresholds to EAR and was wrong.) No single eye signal wins everywhere: EAR is better on DMD and at night, the blink score on the daytime phone
 take. Default stays blink score; EAR (`--eye ear`) is the recommended setting for night and real-car footage.
 
+**Same flaw, gaze side** (found by watching the night overlay): the clip showed "looking away" whenever the driver's eyes were open.
+Drooping lids raise MediaPipe's eyeLookDown scores, so a drowsy calibration window learned "looking down" as "ahead" (eye_v baseline
+−0.68 vs −0.12 when alert); every alert frame then deviated by 0.63 > 0.35 and read as away. Fix: the robust calibration takes the
+head and eye-direction baseline only from calibration frames whose eyes are open. On that clip all false distraction warnings
+disappeared (only microsleep/sleep remain); re-checked on all labelled data with no change (take 5: 4/4; synthetic: 15/18;
+DMD: identical on every arm, including the gaze clips).
+
 ## E7. Speed
 
 | Part | Speed |
