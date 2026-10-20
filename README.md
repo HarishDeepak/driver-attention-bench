@@ -34,7 +34,7 @@ flowchart LR
 2. **Measure.** Google's MediaPipe finds 478 points on the face and reports how open the eyes are and where the head points.
 3. **Decide.** The system first learns this driver's normal face (calibration), then flags *eyes closed* or *looking away*.
    Timers turn that into the three official warnings: microsleep (1.5 s), sleep (3 s), distraction (3 s).
-4. **Act.** In the CARLA driving simulator, a driver who stays asleep triggers warning → slow down → stop in lane with hazard lights.
+4. **Act.** In the CARLA driving simulator, a driver who stays asleep triggers warning → slow down → a minimal-risk manoeuvre: hazard lights, move to the rightmost lane if it is free, stop at its edge.
 
 <p align="center">
   <img src="results/demo_face_to_carla.gif" width="760" alt="Recorded face drives the CARLA car: eyes close, sleep warning, DMS level WARNING">
@@ -43,7 +43,7 @@ flowchart LR
 Eyes close → sleep warning → DMS level WARNING in the car. The driver looks back within 8 s, so it never escalates further.</sub></p>
 
 <p align="center">
-  <img src="results/demo_carla_safe_stop.gif" width="420" alt="CARLA: slowing, minimal-risk manoeuvre, stop in lane">
+  <img src="results/demo_carla_safe_stop.gif" width="420" alt="CARLA: slowing, minimal-risk manoeuvre, lane change right, stop at the lane edge">
   <img src="results/live_escalation.png" width="440" alt="CARLA ego speed during escalation">
 </p>
 <p align="center"><sub>If the driver stays asleep (simulated driver, eyes closed from 2 s): warning 3.5 s, slowing to 60 km/h from 10 s,
@@ -159,17 +159,20 @@ driver-attention-bench/
 ├── src/                    core library (pure Python, each file has an assert self-check)
 │   ├── signals.py          MediaPipe signals, calibration, per-frame decision, comparison arms
 │   ├── dms_core.py         SD-202 timers (Monitor)
-│   ├── escalation.py       warn → slow → minimal-risk stop
+│   ├── escalation.py       warn → slow → minimal-risk manoeuvre (2 m/s² ramp)
+│   ├── dino_eye.py         DINOv2 + linear probe eye-state arm (live, GPU)
 │   ├── variants.py         IR look, glare, dark, sunglasses, mask
 │   ├── evaluate.py         event matching, Wilson CI, false alerts/h, arm comparison
 │   └── report.py           PDF test report
 ├── scripts/                entry points
 │   ├── run_clip.py         one video / camera → per-frame CSV + warnings
 │   ├── replay.py           re-run the decision step on saved signals (threshold sweeps, LOSO)
+│   ├── render_overlay.py   burn decisions, truth and warnings into a video   cues_to_labels.py  voice-cue log → labels
 │   ├── dmd_to_labels.py    DMD OpenLABEL → events + scoring scope
-│   ├── carla_fcw.py        collision-warning sweep      live_demo.py   escalation in CARLA
+│   ├── carla_fcw.py        collision-warning sweep      dms_safety_mc.py  DMS accuracy → crash Monte Carlo
+│   ├── live_demo.py        DMS → escalation → CARLA (traffic, minimal-risk manoeuvre via CARLA BasicAgent, --video)
 │   ├── ros2/               dms_state_pub.py (rclpy), record.sh (rosbag2)
-│   ├── fm_eye_probe.py     DINOv2 / CLIP probes          vlm_arm.py     hosted VLM test
+│   ├── fm_eye_probe.py     DINOv2 / CLIP probes (DMD)   ir_eye_probe.py  infrared (MRL Eye)   vlm_arm.py  hosted VLMs
 │   ├── cosmos_transfer.py  Cosmos Transfer request (prepared, endpoint unavailable on free tier)
 │   └── make_results.py     builds results/ from out/
 ├── scenarios/*.toml        test suites: clips × variants × settings
@@ -186,21 +189,21 @@ driver-attention-bench/
 python src/dms_core.py && python src/signals.py && python src/evaluate.py && python scripts/replay.py
 
 # one video or camera with live overlay
-python scripts/run_clip.py <video.mp4 | camera-index> --show
+python scripts/run_clip.py <video.mp4 | camera-index> --show [--eye ear|dino] [--record take.mp4]
 
 # a scenario suite (Linux / WSL): clips × variants → scoring → out/<name>/report.pdf
 bash run_suite.sh scenarios/synthetic.toml          # or scenarios/dmd.toml
 
 # CARLA 0.9.16 (start CarlaUE4.exe -quality-level=Low first)
 python scripts/carla_fcw.py                         # collision-warning sweep
-python scripts/live_demo.py sim:2-40 --headless     # escalation with a simulated driver (or a camera index)
+python scripts/live_demo.py sim:2-40 --headless --video out.mp4   # simulated driver (or a camera index / face video)
 
 # ROS 2 (Jazzy): publish + record + replay the driver state
 bash scripts/ros2/record.sh
 ```
 
 **Setup.** Python 3.12: `mediapipe opencv-python onnxruntime carla matplotlib` (+ `torch transformers scikit-learn` for the
-foundation-model probe). Models go in `models/`, not in git:
+foundation-model arms, `shapely networkx` for CARLA's navigation agents used in the minimal-risk manoeuvre). Models go in `models/`, not in git:
 - `face_landmarker.task`: https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
 - `yunet.onnx` (optional face fallback): `face_detection_yunet_2023mar.onnx` from opencv_zoo
 - `mobileone_s0_gaze.onnx` (optional `--gaze mobilegaze` arm): MobileGaze MobileOne-S0 export, MIT licence
@@ -210,7 +213,7 @@ Optional parts (ROS 2, Blender, Cosmos): [`docs/details/`](docs/details/).
 
 ## Limitations
 
-- DMD: 6 drivers, RGB face camera, one car. Synthetic: 3 rendered identities with simple eyelids. No own IR recordings.
+- DMD: 6 drivers, RGB face camera. Night: 2 hand-labelled NITYMED videos. Own face: a few phone takes. IR: still eye crops only.
 - Thresholds, reaction times and braking values are stated assumptions, not values from any product.
 - CARLA has no in-cabin camera: the face comes from video, the vehicle from the simulator.
 - Per-frame foundation-model results exclude half-open frames, so they are easier than the event-level task.
