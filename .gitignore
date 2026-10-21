@@ -19,4 +19,5 @@ docs/details/RESEARCH.md
 models/*.npz
 data/mrl/
 data/nitymed/
+data/rldd/
 docs/details/CARLA.md

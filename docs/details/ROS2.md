@@ -31,7 +31,7 @@ bash scripts/ros2/record.sh sim:2-40 25
 | Option | Status |
 |---|---|
 | **A. CARLA's native ROS 2 on the Windows package** | **Not usable [verified].** The 0.9.16 Windows package accepts the API (`ros_name`, `ros_frame_id`, `ros_publish_tf` attributes exist; `sensor.enable_for_ros()` / `is_enabled_for_ros()` return True) and the server starts with `-ros2`, but: `CarlaUE4-Win64-Shipping.exe` contains no FastDDS/eprosima/DomainParticipant strings, and with `-ros2` + an enabled camera the server process opens zero UDP sockets (DDS discovery uses UDP). So the calls are stubs. Docs show the feature only with `./CarlaUnreal.sh --ros2` ([ROS2 native interface](https://carla-ue5.readthedocs.io/en/latest/ros2_native/), [quickstart extras](https://carla.readthedocs.io/en/0.9.16/ext_quickstart/)): a Linux build. [U] whether a Linux package has it compiled in. |
-| **B. WSL ROS 2 node + `carla` Python client (recommended)** | **Works [verified]** since port 2000 is reachable from WSL (below): `~/dmsvenv` has the `carla` 0.9.16 wheel; from WSL `carla.Client("172.25.192.1", 2000)` connected, spawned a vehicle + camera and received a streamed frame (ports 2000-2002). A node there can publish ego speed/images and subscribe to `/dms/state` to drive the ego, with no DDS inside CARLA. Not written yet (YAGNI until needed). |
+| **B. WSL ROS 2 node + `carla` Python client (recommended)** | **Works [verified]** since port 2000 is reachable from WSL (below): `~/dmsvenv` has the `carla` 0.9.16 wheel; from WSL `carla.Client("172.25.192.1", 2000)` connected, spawned a vehicle + camera and received a streamed frame (ports 2000-2002). A node there can publish ego speed/images and subscribe to `/dms/state` to drive the ego, with no DDS inside CARLA. Not written yet. |
 | **C. ROS 2 on Windows (Jazzy/Humble binaries) + `carla` client** | [U] Windows binaries exist for both distros; same architecture as B but without WSL networking. Not tried. |
 | **D. Linux CARLA server + native ROS 2 (Humble container)** | [U] The only route to the native publisher. Needs the Linux package (~20 GB), Docker with GPU in WSL, and 6 GB VRAM is below the docs' 8 GB recommendation. Not tried. |
 
@@ -49,9 +49,9 @@ Measured 2026-10-20: WSL 2.4.13, NAT mode, Windows host `172.25.192.1` (`ip rout
 - **Currently reachable [verified].** TCP connect to `172.25.192.1:2000` works and the client talks to the server (including sensor
   streaming). Reason: Windows has two inbound Allow rules named `CARLA UE4` (TCP and UDP, any port, profile **Public**, scoped to
   `...\CarlaUE4\Binaries\Win64\CarlaUE4-Win64-Shipping.exe`), which is what the Windows "allow access" prompt creates on first launch.
-  I did not create or change any firewall rule. An earlier session saw the port blocked, i.e. this depends on that prompt having been
+  No firewall rule was created or changed. The port was blocked at an earlier point, so reachability depends on that prompt having been
   accepted. The rule is program-scoped, so it survives server restarts.
-- **If it is blocked again** (rule deleted, new CARLA folder, network profile changed), the decision is yours; I applied none:
+- **If it is blocked again** (rule deleted, new CARLA folder, network profile changed), none of these was applied:
   1. *Firewall rule for the WSL vNIC* (admin PowerShell), narrow:
      `New-NetFirewallRule -DisplayName "CARLA from WSL" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 2000-2002 -InterfaceAlias "vEthernet (WSL (Hyper-V firewall))"`
      Pro: minimal, keeps NAT. Con: needs admin; the WSL gateway IP can change after a reboot (use `ip route` each time, do not hardcode).

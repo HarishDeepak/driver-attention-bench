@@ -11,8 +11,15 @@ class Escalation:
         self.cruise, self.level, self.target = cruise_kmh, "ok", cruise_kmh
         self.closed0 = self.away0 = self.inatt0 = self.att0 = self.t_last = None
 
-    def step(self, t, closed, away, warned, speed_kmh):
-        """closed/away: DMS booleans this frame; warned: kinds fired this frame (dms_core.Monitor.step); speed in km/h."""
+    def step(self, t, closed, away, warned, speed_kmh, drowsy=0):
+        """closed/away: DMS booleans this frame; warned: kinds fired this frame (dms_core.Monitor.step); speed in km/h;
+        drowsy: drowsiness.Drowsiness level. Level 3 (repeated microsleeps) adds a degraded mode: speed capped at SLOW_KMH while
+        the driver is otherwise attentive (our assumption: Euro NCAP asks only for sensitive ADAS, no production system found that
+        slows a drowsy driver). The unresponsive-driver path (MRM) is unchanged and still needs the 13 s / 14 s timers."""
+        lvl, tgt = self._step(t, closed, away, warned, speed_kmh)
+        return ("degraded", min(tgt, SLOW_KMH)) if drowsy >= 3 and lvl in ("ok", "warning") else (lvl, tgt)
+
+    def _step(self, t, closed, away, warned, speed_kmh):
         dt = 0.0 if self.t_last is None else t - self.t_last
         self.t_last = t
         self.closed0 = (t if self.closed0 is None else self.closed0) if closed else None
@@ -70,4 +77,10 @@ if __name__ == "__main__":
     assert lvl0 == "mrm" and abs((tg0 - tg1) - 2.0 * 3.6 * 1.0) < 1e-6, (lvl0, tg0, tg1)
     recover = sim(closed_until=5.0, total=10)
     assert [l for _, l in recover] == ["ok", "warning", "ok"], recover
+    # drowsiness level 3 caps the speed while attentive, but never delays or replaces the MRM
+    e = Escalation()
+    assert e.step(0.0, False, False, [], 80.0, drowsy=3) == ("degraded", 60.0) and e.step(0.05, False, False, [], 80.0, drowsy=2) == ("ok", 80.0)
+    e, m = Escalation(), Monitor()
+    lv = [e.step(i / 20, True, False, m.step(i / 20, True, False), 60.0, drowsy=3)[0] for i in range(int(13 * 20) + 1)]
+    assert lv[0] == "degraded" and lv[-1] == "mrm", lv[-1]
     print("escalation OK", unresp, recover)

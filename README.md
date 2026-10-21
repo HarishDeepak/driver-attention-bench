@@ -8,6 +8,12 @@ This project builds such a driver monitor from open tools and then **tests it th
 on real drivers, on computer-generated drivers, against the official timing rules, and in a driving simulator where a sleeping
 driver makes the car slow down and stop.
 
+**Results at a glance** (small datasets; every number with its limits in [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md)):
+- Real drivers (DMD): 22 of 49 eye-closure warnings within ±0.2 s with the default signal, 30-31 of 49 with EAR; most early misses were test-setup mistakes, not detector mistakes.
+- Night drivers (NITYMED): hand-labelled hits 7 → 16 of 27 after a robust calibration; real infrared eyes need infrared training data (0.69 → 0.94).
+- Foundation models and VLMs did not beat the simple eyelid signal for a 0.2 s warning.
+- Simulator: a sleeping driver gets warning → slow-down → lane change right → stop; a drowsy driver with repeated microsleeps gets a drowsiness level that caps the speed; a Monte Carlo links detector accuracy to crash rate (87 % → 44 % at 50 km/h).
+
 <p align="center">
   <img src="results/demo_live_phone.gif" width="600" alt="Live test with a phone camera: eyes closed, looking down, head turned; warnings fire">
 </p>
@@ -37,6 +43,7 @@ flowchart LR
 3. **Decide.** The system first learns this driver's normal face (calibration), then flags *eyes closed* or *looking away*.
    Timers turn that into the three official warnings: microsleep (1.5 s), sleep (3 s), distraction (3 s).
 4. **Act.** In the CARLA driving simulator, a driver who stays asleep triggers warning → slow down → a minimal-risk manoeuvre: hazard lights, move to the rightmost lane if it is free, stop at its edge.
+   A driver who keeps having short microsleeps gets a drowsiness level (rest advice → urgent warning → speed capped).
 
 <p align="center">
   <img src="results/demo_face_to_carla.gif" width="760" alt="Recorded face drives the CARLA car: eyes close, sleep warning, DMS level WARNING">
@@ -72,7 +79,7 @@ minimal-risk manoeuvre from 15 s (hazards on, CARLA's planner checks the right l
   <img src="results/demo_night_nitymed.gif" width="560" alt="Night-time driver: microsleep and sleep warnings">
 </p>
 <p align="center"><sub>Night driving, real car (NITYMED, CC BY 4.0, Petrellis et al.): EAR with robust calibration; yellow = hand-labelled truth.</sub></p>
-<p align="center"><a href="results/videos/night_nitymed_P1042793.mp4?raw=true">⬇ full video, 2 min (MP4 download)</a> · <a href="results/videos/night_driver_to_carla.mp4?raw=true">⬇ same driver driving the CARLA car (MP4)</a>: a warning at each microsleep cluster; no slow-down, because he always reopened his eyes within 8 s (escalation needs continuous inattention)</p>
+<p align="center"><a href="results/videos/night_nitymed_P1042793.mp4?raw=true">⬇ full video, 2 min (MP4 download)</a> · <a href="results/videos/night_driver_to_carla.mp4?raw=true">⬇ same driver driving the CARLA car (MP4)</a>: a warning at each microsleep cluster; no minimal-risk stop, because he always reopened his eyes within seconds, but the repeated microsleeps raise the drowsiness level to 3 at 54 s and cap the speed at 60 km/h (finding 4)</p>
 3. **Driver state changes the crash outcome, and detector accuracy decides by how much.** In CARLA, a distracted driver with a
    standard collision warning crashes at 30 and 50 km/h; warning earlier because the camera flags the distraction avoids both.
    A Monte Carlo over driver reaction times then plugs in the accuracy measured on real drivers: at 50 km/h the crash rate falls
@@ -85,6 +92,22 @@ minimal-risk manoeuvre from 15 s (hazards on, CARLA's planner checks the right l
 <p align="center">
   <img src="results/dms_safety_mc.png" width="90%" alt="Crash probability vs speed for no DMS, measured DMS and ideal DMS">
 </p>
+
+4. **Drowsy is not the same as asleep, and regulations treat them differently.** Euro NCAP asks for a warning plus earlier
+   collision warnings for a drowsy driver; only an *unresponsive* driver (eyes closed ≥ 6 s, or no reaction to a warning) gets an
+   automatic stop. So the project now builds a drowsiness level from microsleeps in the last 5 minutes, long blinks and PERCLOS
+   (share of time with eyes closed): 1 = take a break, 2 = drowsy (urgent warning, earlier collision warning), 3 = repeated
+   microsleeps despite warnings → speed capped at 60 km/h (my assumption, not a rule). Watching where it fired found a real bug:
+   looking down lowers the eyelids, and on alert drivers *every* counted microsleep happened with the head turned; ignoring
+   those cut false "drowsy" levels on alert DMD drivers from 4 of 6 clips to 1 of 6 (EAR) and 1 to 0 (default), with no loss
+   on the drowsy sessions. A 10-minute video of an alert person (UTA-RLDD) stayed at level 0 throughout.
+
+<p align="center">
+  <img src="results/demo_drowsiness_carla.gif" width="760" alt="Night driver drives CARLA: repeated microsleeps raise the drowsiness level to 3 and the speed is capped at 60 km/h">
+</p>
+<p align="center"><sub>Night driver (NITYMED, CC BY 4.0) drives the CARLA car: warnings at 16.7 s and 31.6 s, drowsiness level 3 at 37.0 s,
+speed capped at 60 km/h; no stop, because each closure is short. The simulated sleeping driver still gets the full minimal-risk stop.</sub></p>
+<p align="center"><a href="results/videos/drowsy_night_driver_to_carla.mp4?raw=true">⬇ full run, 2 min (MP4 download)</a> · <img src="results/drowsiness_carla.png" width="49%" alt="Speed and drowsiness level over time"></p>
 
 Personal project by Harish Deepak (TU Darmstadt), October 2026: small datasets, simplified car physics, no product claims.
 
@@ -148,6 +171,9 @@ CARLA's native ROS 2 is not used: it is a no-op in the Windows build and Jazzy h
 stateDiagram-v2
     direction LR
     [*] --> ok
+    ok --> degraded: drowsiness level 3 (repeated microsleeps)
+    degraded --> ok: level falls (5-min window)
+    degraded --> warning: microsleep / sleep / distraction
     ok --> warning: microsleep / sleep / distraction
     warning --> slowing: still inattentive 8 s
     slowing --> mrm: eyes closed 13 s or away 14 s
@@ -164,7 +190,8 @@ driver-attention-bench/
 ├── src/                    core library (pure Python, each file has an assert self-check)
 │   ├── signals.py          MediaPipe signals, calibration, per-frame decision, comparison arms
 │   ├── dms_core.py         SD-202 timers (Monitor)
-│   ├── escalation.py       warn → slow → minimal-risk manoeuvre (2 m/s² ramp)
+│   ├── escalation.py       warn → slow → minimal-risk manoeuvre (2 m/s² ramp); degraded speed cap at drowsiness level 3
+│   ├── drowsiness.py       drowsiness level 0-3 from microsleeps, long blinks, PERCLOS (E12)
 │   ├── dino_eye.py         DINOv2 + linear probe eye-state arm (live, GPU)
 │   ├── variants.py         IR look, glare, dark, sunglasses, mask
 │   ├── evaluate.py         event matching, Wilson CI, false alerts/h, arm comparison
@@ -172,12 +199,13 @@ driver-attention-bench/
 ├── scripts/                entry points
 │   ├── run_clip.py         one video / camera → per-frame CSV + warnings
 │   ├── replay.py           re-run the decision step on saved signals (threshold sweeps, LOSO)
+│   ├── drowsy_eval.py      drowsiness level per clip on saved signals, vs the level the labels give
 │   ├── render_overlay.py   burn decisions, truth and warnings into a video
 │   ├── cues_to_labels.py   voice-cue log → labels (no detections used)
 │   ├── dmd_to_labels.py    DMD OpenLABEL → events + scoring scope
 │   ├── carla_fcw.py        collision-warning sweep
 │   ├── dms_safety_mc.py    DMS accuracy → crash-probability Monte Carlo
-│   ├── live_demo.py        DMS → escalation → CARLA (traffic, minimal-risk manoeuvre via CARLA BasicAgent, --video)
+│   ├── live_demo.py        DMS → drowsiness + escalation → CARLA (BasicAgent ego, traffic, minimal-risk manoeuvre, --video)
 │   ├── ros2/               dms_state_pub.py (rclpy), record.sh (rosbag2)
 │   ├── fm_eye_probe.py     DINOv2 / CLIP probes (DMD)
 │   ├── ir_eye_probe.py     infrared eye images (MRL Eye)
@@ -228,5 +256,6 @@ Code: MIT (see `LICENSE`). Data and models are third-party and keep their own te
 
 - DMD: 6 drivers, RGB face camera. Night: 2 hand-labelled NITYMED videos. Own face: a few phone takes. IR: still eye crops only.
 - Thresholds, reaction times and braking values are stated assumptions, not values from any product.
+- Drowsiness levels are KSS-like, tested on acted microsleeps (2-3 min clips) and one 10-minute alert video; not validated against KSS.
 - CARLA has no in-cabin camera: the face comes from video, the vehicle from the simulator.
 - Per-frame foundation-model results exclude half-open frames, so they are easier than the event-level task.

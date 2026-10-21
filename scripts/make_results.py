@@ -174,8 +174,32 @@ FULL = {  # full-length videos next to the short README GIFs (all publishable: o
     "videos/carla_escalation_sim.mp4": "carla_minimal_risk_manoeuvre.mp4",
     "videos/male_P1042793_720__clean_ear.mp4": "night_nitymed_P1042793.mp4",
     "videos/synth02_sleep__clean.mp4": "synthetic_sleep.mp4",
-    "videos/carla_night_nitymed.mp4": "night_driver_to_carla.mp4",
+    # E12 runs (BasicAgent ego, drowsiness level); replace the first night run, whose TM ego slowed at a junction ~30 s in
+    "videos/e12_carla_night_P1042793.mp4": "night_driver_to_carla.mp4",
+    "videos/e12_carla_night_P1043089.mp4": "drowsy_night_driver_to_carla.mp4",
 }
+
+
+def drowsy_chart(src, path):
+    """E12: CARLA ego speed and drowsiness level over time for a NITYMED driver run."""
+    r = read(src)
+    t = [float(x["t"]) for x in r]
+    fig, ax = plt.subplots(figsize=(7, 3))
+    ax.plot(t, [float(x["speed_kmh"]) for x in r], color="#4C72B0", label="ego speed (km/h)")
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("CARLA ego speed (km/h)")
+    ax.set_xlabel("time (s)")
+    for x in r:
+        if x["warnings"]:
+            ax.axvline(float(x["t"]), color="#C44E52", ls=":", lw=0.8)
+    ax2 = ax.twinx()
+    ax2.step(t, [int(x["drowsy"]) for x in r], where="post", color="#DD8452", label="drowsiness level")
+    ax2.set_ylim(-0.2, 3.5)
+    ax2.set_yticks(range(4), ["0 alert", "1 tiring", "2 drowsy", "3 severe"], fontsize=7)
+    fig.legend(fontsize=7, loc="lower right", bbox_to_anchor=(0.86, 0.2))
+    ax.set_title("Night driver (NITYMED) drives CARLA: repeated eye-closure warnings (red) -> level 3 -> speed capped at 60 km/h", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(path, dpi=130)
 
 
 def full_videos():
@@ -220,6 +244,11 @@ def main():
     clip = "synth02_sleep"
     n = demo_gif(ROOT / "data/synthetic" / f"{clip}.mp4", OUT / "synthetic/runs" / f"{clip}__clean_frames.csv",
                  OUT / "synthetic/runs" / f"{clip}__clean_warnings.csv", RES / "demo_synthetic_sleep.gif")
+    e12 = OUT / "live_20261021_021937.csv"  # live_demo.py female_P1043089_720.mp4 --eye ear --calib-s 5 --video e12_carla_night_P1043089.mp4
+    if e12.exists():
+        drowsy_chart(e12, RES / "drowsiness_carla.png")
+    if (OUT / "videos/e12_carla_night_P1043089.mp4").exists():
+        clip_gif(OUT / "videos/e12_carla_night_P1043089.mp4", RES / "demo_drowsiness_carla.gif", 28, 46, fps=5)
     full_videos()
     for p in sorted(RES.rglob("*.*")):
         print(f"{p.name:32} {p.stat().st_size / 1024:8.0f} KiB")

@@ -1,6 +1,7 @@
 """Live driver-in-the-loop demo: camera / video / synthetic DMS input -> FaceSignals -> Classifier -> Monitor -> Escalation -> CARLA ego.
 SOURCE = camera index | video file | sim:A-B (eyes closed from A to B seconds, no camera).
-Ego drives Town04_Opt under Traffic Manager autopilot; each tick the escalation target speed is given to the TM.
+Ego drives Town04_Opt with CARLA's BasicAgent along its lane (traffic: Traffic Manager); each tick the escalation target speed is
+given to the agent. A drowsiness level (src/drowsiness.py, E12) runs beside the SD-202 warnings; level 3 caps the speed.
 ALL ESCALATION NUMBERS ARE ILLUSTRATIVE ASSUMPTIONS (see src/escalation.py), not a certified function.
 Needs a running CARLA 0.9.16 server (127.0.0.1:2000). Output: out/live_<time>.csv. q quits the window."""
 import argparse
@@ -19,6 +20,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 from dms_core import Monitor  # noqa: E402
+from drowsiness import Drowsiness  # noqa: E402
 from escalation import Escalation  # noqa: E402
 
 # CARLA's reference navigation agents ship with the server package (needs shapely + networkx)
@@ -27,6 +29,8 @@ from agents.navigation.basic_agent import BasicAgent  # noqa: E402
 from agents.navigation.local_planner import RoadOption  # noqa: E402
 
 DT, MAP, CRUISE, AHEAD, STRAIGHT = 0.05, "Town04_Opt", 80.0, 800.0, 200.0  # Town04's longest straight is ~220 m (a highway loop)
+# drowsiness level shown in the HMI; level 2 would also switch the collision warning to TTC 3.0 s (E6 "DMS-gated"), no lead car here
+DROWSY =["alert", "tiring: take a break", "DROWSY: rest now", "SEVERE: speed limited"]
 TRAFFIC = [(-1, 40.0), (-1, -30.0), (1, 25.0), (1, -45.0), (-1, 110.0), (1, 90.0)]  # (left -1 / right +1 lane, metres ahead of ego)
 ap = argparse.ArgumentParser()
 ap.add_argument("source", help="camera index, video file or sim:A-B (eyes closed A..B seconds)")
@@ -115,7 +119,8 @@ def lane_plan(w, length):
     return plan
 
 
-LEVEL_BGR = {"ok": (0, 200, 0), "warning": (0, 200, 255), "slowing": (0, 128, 255), "mrm": (0, 0, 255), "stopped": (0, 0, 160)}
+LEVEL_BGR = {"ok": (0, 200, 0), "warning": (0, 200, 255), "degraded": (255, 160, 0), "slowing": (0, 128, 255), "mrm": (0, 0, 255),
+             "stopped": (0, 0, 160)}
 
 
 def speed_strip(rows, t_max, w, h=150, v_max=100.0):
@@ -178,15 +183,14 @@ try:
     actors.append(ego)
     fwd = wp.transform.get_forward_vector()
     ego.set_target_velocity(carla.Vector3D(fwd.x * CRUISE / 3.6, fwd.y * CRUISE / 3.6, fwd.z * CRUISE / 3.6))  # 3D: ~3.5% grade
-    ego.set_autopilot(True, tm.get_port())
-    tm.auto_lane_change(ego, False)
-    tm.ignore_lights_percentage(ego, 100)
-    tm.distance_to_leading_vehicle(ego, 5.0)
-    tm.set_desired_speed(ego, CRUISE)
-    # pin the TM to the start lane: at highway splits it otherwise picks a random branch (seen in a replay: the minimal-risk
-    # stop ended at an exit gore instead of in lane)
-    route = max(AHEAD, 1.2 * CRUISE / 3.6 * a.seconds)  # the TM stops where its path ends: cover the whole run
-    tm.set_path(ego, lane_path(wp, route))
+    # the ego drives with CARLA's BasicAgent (LocalPlanner + PID) along its start lane, speed limits off: the Traffic Manager capped
+    # it at a 30 km/h junction limit ~700 m ahead despite set_desired_speed (ego at 16 km/h at 35 s in every run, also the published
+    # night run). Pinned plan: at highway splits a free planner picks a random branch (an MRM once ended at an exit gore).
+    route = max(AHEAD, 1.2 * CRUISE / 3.6 * a.seconds)  # paths end where planned: cover the whole run
+    cruise = BasicAgent(ego, target_speed=CRUISE)
+    cruise.ignore_traffic_lights(True)
+    cruise.follow_speed_limits(False)
+    cruise.set_global_plan(lane_plan(wp, route))
     # traffic in the neighbouring lanes at normal speed: shows the ego slowing and stopping, and makes the stop a stop in traffic
     cars = [b for b in world.get_blueprint_library().filter("vehicle.*") if int(b.get_attribute("number_of_wheels")) == 4]
     for i, (side, ahead) in enumerate(TRAFFIC):
@@ -220,8 +224,8 @@ try:
         top.listen(q2.put)
     world.tick()
 
-    mon, esc = Monitor(), Escalation(CRUISE)
-    t_wall, tick, level, frame, trim, pending, mrm = time.monotonic(), 0, "ok", None, 0.0, [], None
+    mon, esc, dr = Monitor(), Escalation(CRUISE), Drowsiness()
+    t_wall, tick, level, frame, pending, mrm, drowsy = time.monotonic(), 0, "ok", None, [], None, 0
     print(f"map {world.get_map().name}, source {a.source}, cruise {CRUISE:.0f} km/h")
     while True:
         if sim:
@@ -234,33 +238,32 @@ try:
             t = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000 if not live else tick * DT
             st = clf.step(t, fs(frame, t * 1000), fs.fb)
             closed, away = (bool(st[0]), st[1]) if st else (False, False)  # calibrating: assume attentive; eyes unknown (None) = not closed
-            if not live and t < tick * DT:  # video (25-30 fps) faster than the 20 Hz sim: every frame feeds the DMS, the car steps at sim rate
-                pending += mon.step(t, closed, away)
-                continue
+        w = mon.step(t, closed, away)
+        drowsy = dr.step(t, closed, w, None if sim else clf.perclos, away)
+        if not sim and not live and t < tick * DT:  # video (25-30 fps) faster than the 20 Hz sim: every frame feeds the DMS, the car steps at sim rate
+            pending += w
+            continue
         if t > a.seconds:
             break
         v = ego.get_velocity()
         speed = math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2) * 3.6
-        warned, pending = pending + mon.step(t, closed, away), []
-        level, target = esc.step(t, closed, away, warned, speed)
+        warned, pending = pending + w, []
+        level, target = esc.step(t, closed, away, warned, speed, drowsy)
         if level == "stopped":
-            ego.set_autopilot(False, tm.get_port())  # TM would override the brake
             ego.apply_control(carla.VehicleControl(brake=1.0, hand_brake=True))
         elif level == "mrm":
-            if mrm is None:  # take over from the TM once, at the start of the manoeuvre
-                ego.set_autopilot(False, tm.get_port())
+            if mrm is None:  # the MRM agent (lane change right, stop at the edge) takes over once, at the start of the manoeuvre
                 mrm = MinimalRiskManoeuvre(ego, world)
             ego.apply_control(mrm.step(target, world.get_actors().filter("vehicle.*")))
         else:
-            # ponytail: TM holds ~3% under its desired speed; slow integral trim on the command closes that (not a real controller)
-            trim = max(-10.0, min(10.0, trim + 0.01 * (target - speed)))
-            tm.set_desired_speed(ego, max(target + trim, 0.1))
+            cruise.set_target_speed(target)
+            ego.apply_control(cruise.run_step())
         # lights are not automatic for a client-controlled car: hazards from the start of the MRM (R157) and kept at standstill,
         # brake lights whenever the brake is applied, position lights always
         L = carla.VehicleLightState
         hazards, braking = level in ("mrm", "stopped"), ego.get_control().brake > 0.05 or level == "stopped"
         ego.set_light_state(L(int(L.Position) | (int(L.LeftBlinker) | int(L.RightBlinker) if hazards else 0) | (int(L.Brake) if braking else 0)))
-        rows.append([round(t, 3), int(closed), int(away), "+".join(warned), level, round(target, 2), round(speed, 2)])
+        rows.append([round(t, 3), int(closed), int(away), "+".join(warned), level, round(target, 2), round(speed, 2), drowsy])
         if not changes or changes[-1][1] != level:
             changes.append((t, level, speed))
             print(f"t={t:6.2f}s  {level:<8} target {target:5.1f}  speed {speed:5.1f} km/h")
@@ -273,9 +276,10 @@ try:
             txt = [f"t={t:.1f}s  closed={int(closed)} away={int(away)}" + ("  [sim]" if sim else ""),
                    f"level: {level.upper()}", f"target {target:5.1f}  actual {speed:5.1f} km/h",
                    "warnings: " + (", ".join(sorted(mon.fired)) or "-"),
+                   f"drowsiness {drowsy}: {DROWSY[drowsy]}" + ("  FCW early" if drowsy >= 2 else ""),
                    "lights: " + (" ".join(n for n, on in (("HAZARDS", hazards), ("BRAKE", braking)) if on) or "-"),
                    "lane: " + (f"{world.get_map().get_waypoint(ego.get_location()).lane_id}" + ("  -> moving right" if mrm and mrm.target_lane else ""))]
-            col = {"ok": (0, 200, 0), "warning": (0, 200, 255), "slowing": (0, 128, 255)}.get(level, (0, 0, 255))
+            col = LEVEL_BGR.get(level, (0, 0, 255))
             for i, line in enumerate(txt):
                 cv2.putText(left, line, (8, 25 + 26 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.55, col if i == 1 else (255, 255, 255), 2)
             tim = q2.get(timeout=10)
@@ -319,7 +323,7 @@ out.mkdir(exist_ok=True)
 path = out / f"live_{datetime.now():%Y%m%d_%H%M%S}.csv"
 with open(path, "w", newline="") as fh:
     cw = csv.writer(fh)
-    cw.writerow("t,closed,away,warnings,level,target_kmh,speed_kmh".split(","))
+    cw.writerow("t,closed,away,warnings,level,target_kmh,speed_kmh,drowsy".split(","))
     cw.writerows(rows)
 print("timeline:", " -> ".join(f"{l}@{t:.1f}s" for t, l, _ in changes))
 print(f"final level {changes[-1][1] if changes else '-'}, final speed {rows[-1][6] if rows else '-'} km/h, "

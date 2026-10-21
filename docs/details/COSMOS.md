@@ -1,6 +1,6 @@
 # Cosmos Transfer prep (CARLA control videos -> photoreal variants)
 
-Tags: **[verified]** = run here 2026-10-20, **[doc]** = read in a source, **[U]** = unverified. No NVIDIA account or key exists; nothing was sent anywhere.
+Tags: **[verified]** = run here 2026-10-20, **[doc]** = read in a source, **[U]** = unverified. No NVIDIA account or key existed at the time of this Cosmos check; nothing was sent for Cosmos.
 
 ## What it does
 
@@ -15,13 +15,13 @@ generated imagery of a driving scene, not a driver face, so it does not feed the
 - **Hosting.** Documented ways to get a server:
   1. CARLA's server image (Brev 1-click launchable or `make_docker.sh`, both in the CARLA docs above; needs a funded Brev account) + CARLA's own `cosmos_client.py` (Gradio client; `PythonAPI/examples/nvidia/cosmos/client`). This is the path NVIDIA/CARLA documented end to end.
   2. A self-hosted NIM (`POST /v1/infer`, [API reference](https://docs.nvidia.com/nim/cosmos/latest/api-reference.html)): needs the big GPU too.
-  3. **build.nvidia.com hosted endpoint:** the Transfer1-7B and Transfer2.5-2B pages are labelled "Free Endpoint", but I found **no documented API request for custom videos**, and a developer forum thread reports `404 Function not found for account` when calling it ([forum, 2026-09-02](https://forums.developer.nvidia.com/t/cosmos-transfer-2-5-free-endpoint-listed-but-custom-api-generation-is-unavailable-and-returns-404/382121); no NVIDIA reply seen). The web "Experience" tab may only offer preset examples. Treat hosted-with-custom-videos as **[U]**.
+  3. **build.nvidia.com hosted endpoint:** the Transfer1-7B and Transfer2.5-2B pages are labelled "Free Endpoint", but **no documented API request for custom videos** was found, and a developer forum thread reports `404 Function not found for account` when calling it ([forum, 2026-09-02](https://forums.developer.nvidia.com/t/cosmos-transfer-2-5-free-endpoint-listed-but-custom-api-generation-is-unavailable-and-returns-404/382121); no NVIDIA reply seen). The web "Experience" tab may only offer preset examples. Treat hosted-with-custom-videos as **[U]**.
 - Input rules [doc, [model card](https://build.nvidia.com/nvidia/cosmos-transfer1-7b)]: mp4 control videos derived from the same source with identical size/length; lengths that are multiples of 120 frames work best; prompt under 300 words. Our clips: 1280x720, 120 frames at 24 fps (5 s).
 
-## Get a key (you must do this yourself)
+## Get a key
 
 Sign up at <https://build.nvidia.com> (NVIDIA Developer account), generate an API key (`nvapi-...`), set it for the session only:
-`$env:NVIDIA_API_KEY = "nvapi-..."`. Do not commit it. Cost/credits: **[U]** I could not find credit amounts for the free endpoint; the NIM docs mention
+`$env:NVIDIA_API_KEY = "nvapi-..."`. Do not commit it. Cost/credits: **[U]** no credit amounts were found for the free endpoint; the NIM docs mention
 the free NVIDIA Developer Program (self-hosting on up to 16 GPUs) and a 90-day AI Enterprise trial (business email). Brev bills GPU hours (price not checked).
 
 ## Step 1: control videos (done, [verified])
@@ -41,7 +41,7 @@ Needs `pip install pyyaml` in `.venv` (done) and `ffmpeg` on PATH (winget build 
 Previews: `out/cosmos/preview/*.png`.
 
 Known upstream quirks: (a) on Windows the script's `--class-filter-config` is lost in its worker processes (spawn), so `rgb_edges.mp4` / `rgb_masked.mp4`
-come out black; I deleted them. No edge control video exists; derive one with Canny from `rgb.mp4` if you want it, or use depth+seg only.
+come out black; they were deleted. No edge control video exists; derive one with Canny from `rgb.mp4` if you want it, or use depth+seg only.
 (b) The clip covers the approach only (ego still ~40 m behind the stopped car at the end); the impact at ~6.6 s is cut off. [U] why ~100 of ~132 frames are written.
 (c) The ego hood is visible at the bottom; the camera is at z=1.8 on the ego.
 

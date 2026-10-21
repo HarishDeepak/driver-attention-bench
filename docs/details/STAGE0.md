@@ -12,5 +12,5 @@
 | VRAM, under load | **2263 MiB** of 6141 MiB |
 | Result | `SMOKE_OK`, no crash / OOM |
 
-**Decision: GPU test passed, CARLA stage stays in scope.** ~3.8 GB VRAM headroom (a second camera or Town with more assets is fine).
+The GPU test passed, so the CARLA stage goes ahead. About 3.8 GB VRAM headroom (a second camera or Town with more assets is fine).
 Caveat: async mode, 1 camera, low quality. Final sweep will use synchronous mode with a fixed time step, so fps here is only a capacity indicator.

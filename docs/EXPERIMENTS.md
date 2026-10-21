@@ -217,6 +217,85 @@ head and eye-direction baseline only from calibration frames whose eyes are open
 disappeared (only microsleep/sleep remain); re-checked on all labelled data with no change (take 5: 4/4; synthetic: 15/18;
 DMD: identical on every arm, including the gaze clips).
 
+## E12. Drowsiness level: from repeated microsleeps to a degraded mode
+
+**Question.** The warnings so far react to one closure at a time. A driver who keeps having microsleeps is drowsy, and a car could
+do more than beep. What do regulations and car makers actually do? Sources checked (primary where marked):
+- **Euro NCAP Safe Driving, Driver Engagement protocol** (v11, read from the PDF): drowsiness must be detected at KSS > 7 at the
+  latest; the vehicle response for drowsiness, microsleep and sleep is a warning (rest-area advice allowed for drowsiness) plus an
+  **intervention = more sensitive Forward Support** (collision warning / AEB at least 200 ms earlier for an impaired driver) with
+  Lane Support; it may not be reset by the driver. Slowing down is **not** scored for drowsiness. "Assisted Mode" is eligible for
+  sleep. A driver is **unresponsive** when the eyes stay closed ≥ 6 s or the gaze does not return within 3 s of a distraction
+  warning; the Emergency Function then starts by 12-13 s. Our existing MRM at 13 s closed / 14 s away matches that timeline.
+- **EU DDAW** (Reg. 2021/1341): warning at KSS ≥ 8; **ADDW** (Reg. 2023/2590): distraction warning. Warnings only.
+- Production: VW Emergency Assist, Volvo EX90 and Ford BlueCruise slow / stop the car for an **unresponsive** driver; Mercedes and
+  BMW details only from secondary sources [verify]. No production system found that slows a merely drowsy driver [verify].
+
+**Design** (`src/drowsiness.py`, beside the unchanged SD-202 `Monitor`). A KSS-like level from three cues, each over a window:
+microsleep warnings in the last 5 min, long blinks (closed ≥ 0.5 s) in the last minute, PERCLOS over 60 s (used only once its
+window is full: right after calibration it is one blink over a few seconds and read 0.6). Any one cue reaches a level:
+
+| Level | Meaning | Cue (any one) | Car response here |
+|---|---|---|---|
+| 0 | alert | | none |
+| 1 | tiring (KSS ~7) | PERCLOS ≥ 0.08, 1 microsleep, or 6 long blinks / min | rest advice |
+| 2 | drowsy (KSS ≥ 8) | PERCLOS ≥ 0.15 or 2 microsleeps / 5 min | urgent warning + collision warning at TTC 3.0 s instead of 2.0 s (the E6 "DMS-gated" column) |
+| 3 | severe | PERCLOS ≥ 0.30 or 3 microsleeps / 5 min (two drowsiness warnings ignored) | degraded mode: speed capped at 60 km/h (our assumption, not a regulation) |
+
+Unresponsive driver → MRM is unchanged and still needs the 13 s / 14 s timers; level 3 never replaces it. PERCLOS 0.15 is the
+common P80 cut-off; all other thresholds are guesses and would be tuned on progressive data (see Data below).
+
+**Bug found on the way: looking down counted as drowsiness.** On DMD every microsleep warning in the alert gaze sessions (s6) fired
+while the head was out of the forward cone (blink 4/4, EAR 24/24); in the drowsiness sessions (s5) almost none did (1/26, 2/40).
+Looking down lowers the lids. Fix: closures with the head away do not count towards the level (the SD-202 warnings are untouched).
+Cost: a driver whose head drops during a microsleep is counted later (NITYMED P1042793 below), the sleep warning and MRM still apply.
+
+**Results** (offline replay of the saved signals, `scripts/drowsy_eval.py`; "label level" = the same code run on the hand / dataset
+closure labels, so it measures the detector, not the thresholds):
+
+| Data | Blink score (default) | EAR |
+|---|---|---|
+| DMD alert gaze sessions (s6, 6 clips): level ≥ 2 without / with the head-away fix | 1/6 → **0/6** | 4/6 → **1/6** |
+| DMD drowsiness sessions (s5, 7 clips): highest level = label level | 5/7 (2 one or two levels low) | 6/7 (1 one level high) |
+| DMD s5, level 3 reached where the labels reach it (5 clips) | 3/5, all within 0.3 s, never early | 5/5, but 4 of them 8-49 s early |
+| NITYMED, 19 night drivers (all from the microsleep set): highest level 0/1/2/3 | 9 / 5 / 1 / 4 | 5 / 5 / 1 / 8 |
+| NITYMED hand-labelled P1043067 | all levels within 0.2 s of label level | same |
+| NITYMED hand-labelled P1042793 | level 2 at 54 s (label: 3 at 37 s) | level 3, 6-17 s late (first closures with head turned) |
+| Synthetic (6 clips) | 5/6 = label level within 0.1 s; sunglasses clip stays 0 (eyes unknown by design) | same |
+| Own phone take 5 | level 1 at 25.4 s = label level | same |
+| UTA-RLDD subject 08, "alert" video (9.75 min, natural, self-rated) | level 0 throughout, 0 microsleeps | level 0, peak PERCLOS 0.006 |
+
+**CARLA closed loop** (`scripts/live_demo.py <clip> --eye ear`, HMI shows the level):
+
+| Driver | Eye-closure warnings | Level 3 → 60 km/h cap | Offline replay |
+|---|---|---|---|
+| NITYMED P1043089 (night, CC BY 4.0) | 16.7 s, 31.6 s, … | 37.0 s | 37.0 s |
+| NITYMED P1042793 | 13.7 s, 22.2 s, … | 54.3 s | 54.2 s |
+| DMD gB_10 s5 (local only, never published) | 65.3 s, … | 106.2 s | 106.2 s |
+| Simulated sleeping driver (regression) | 3.5 s → slowing 10 s → MRM 15 s → standstill 23.1 s | – | E6: 23.2 s |
+
+![Drowsiness level in CARLA](../results/drowsiness_carla.png)
+
+**Bug fixed in the CARLA demo.** A night run showed the ego slowing to 16 km/h around 30 s with nobody asleep. The recorder and a
+debug print traced it: approaching a highway junction ~700 m ahead, the Traffic Manager applied a 30 km/h junction limit to the ego
+despite `set_desired_speed`, ignoring signs, lights and vehicles (also in the previously published night run). The ego now drives
+with CARLA's `BasicAgent` along its lane with speed limits off (as the MRM already did); this also removed the TM speed-trim hack.
+It holds 78-80 km/h over 130 s; the escalation timeline is unchanged.
+
+**Regression.** SD-202 timers and the per-frame classifier are untouched; re-run: DMD lids-shut 22/49 (8 false alerts) blink,
+31/49 (17) EAR; synthetic 15/18, 0; night hand-labelled 10/27, 0 and 16/27, 1 (5 s calibration); take 5 4/4, 0. All identical to E1-E11.
+
+**Data for progressive drowsiness.** DMD and NITYMED are acted microsleeps over 2-3 min, so the 5-min window is never stressed.
+Free options checked: **UTA-RLDD** (60 people, ~10 min each in self-rated alert / low-vigilant / drowsy states, natural, RGB, Google
+Drive; licence not stated [verify]: never published here). Its Drive quota blocked the download after one video; the alert video is
+in the table, the drowsy pair is pending. **UL-DD** (19 drivers, 40 min continuous, KSS every 4 min, 2025) needs a request with an
+institutional e-mail and a data-use agreement. **DROZY** (IR, sleep deprivation, PSG) and **NTHU-DDD** (acted, licence form) are
+the alternatives. The thresholds above need one of these to be tuned honestly.
+
+**Limits.** Small and short clips; the levels are KSS-like, not validated against KSS; the head-away rule trades missed nodding-off
+closures for fewer false levels; the 60 km/h cap is our assumption; no lead car in the scene, so the earlier collision warning at
+level 2 is shown by the E6 sweep, not in this run.
+
 ## Considered, not done
 
 | Idea | Why not |

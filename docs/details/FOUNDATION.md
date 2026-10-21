@@ -10,11 +10,11 @@ they are not faster. We did not put segmentation or vision-language models into 
   take the CLS token (a 384-number summary of the image) as the feature. You train a small classifier on top; the big model stays frozen.
 - **CLIP (OpenAI, 2021)**: an image encoder and a text encoder trained together so that a photo and its caption get similar vectors.
   Zero-shot means: embed the image, embed prompts such as "a photo of a closed eye", pick the closer one. We use ViT-B/32 (512 numbers).
-- **SAM 3 (Meta, 2025 [verify])**: "segment anything" with text or example prompts. Output is a pixel mask of an object, not a label
+- **SAM 3 (Meta, 2025; not independently verified)**: "segment anything" with text or example prompts. Output is a pixel mask of an object, not a label
   such as "eyelid closed".
-- **Grounding DINO (IDEA Research, 2023 [verify])**: open-vocabulary detector. You type "eye" and get boxes. It does not say whether
+- **Grounding DINO (IDEA Research, 2023; not independently verified)**: open-vocabulary detector. You type "eye" and get boxes. It does not say whether
   the eye is open.
-- **Vision-language models (VLMs, e.g. LLaVA- or Qwen-VL-type [verify])**: a language model that looks at an image and answers in text
+- **Vision-language models (VLMs, e.g. LLaVA- or Qwen-VL-type; not independently verified)**: a language model that looks at an image and answers in text
   ("is the driver's phone visible?"). Flexible, but slow on a small GPU.
 
 ## What we tested
@@ -32,7 +32,7 @@ Both eyes are cropped with MediaPipe landmarks and fed to each model. Everything
 | (e) DINOv2-small linear probe | 0.966 | 0.926 | 4.5 | GPU |
 
 Timing: GPU is an RTX 4050 Laptop (6 GB), fp16, batch 64, model forward only, two eye crops per frame. The MediaPipe number is the
-CPU time of the landmarker call per frame; it was measured while the MediaPipe batch job ran on the same machine, so it is inflated [verify on an idle machine].
+CPU time of the landmarker call per frame; it was measured while the MediaPipe batch job ran on the same machine, so it is inflated (not re-measured on an idle machine).
 
 ## Caveats (read these before quoting numbers)
 
@@ -43,7 +43,7 @@ CPU time of the landmarker call per frame; it was measured while the MediaPipe b
 - **Thresholds are learned on training subjects only.** For (a) and (b) the cut-off is the one that maximises balanced accuracy on the
   other five subjects. The held-out subject never touches it.
 - **Crop geometry is a guess.** Square crop, 1.8x the eye landmark box, not tuned. DINOv2's processor centre-crops a little more.
-- **Only the small models.** Larger DINOv2 or CLIP variants may do better; we did not test them [verify].
+- **Only the small models.** Larger DINOv2 or CLIP variants may do better; we did not test them (not independently verified).
 - **Dataset licence.** DMD is CC BY-NC-ND. No images were written into the repo. Only features and per-frame scores are cached in
   `data/dmd/fm_cache/` (gitignored).
 
@@ -53,15 +53,15 @@ Euro NCAP SD-202 asks for at least 25 frames per second (SD-202 v1.2). That is 4
 - The DINOv2 and CLIP forward passes take about 4 ms per frame on this GPU. They fit the budget.
 - The face-finding pass (MediaPipe) took about 47 ms per frame on CPU in this run, under load. That alone is over 40 ms.
 - A foundation model does not replace the detector: it needs the eye crops from the detector. So on this hardware the detector
-  is the bottleneck, not the model [verify on an idle machine].
+  is the bottleneck, not the model (not re-measured on an idle machine).
 
 ## Why SAM 3, Grounding DINO and VLMs are not in the real-time loop
 
 - **Masks are not eyelid state.** SAM 3 tells you where the eye is, not whether it is shut. Grounding DINO gives boxes. Either
   would still need a classifier on top, which is what the probes above already do.
-- **Too slow for 6 GB.** Segmentation and VLM models run at a few frames per second or less on this GPU, far below 25 Hz [verify].
+- **Too slow for 6 GB.** Segmentation and VLM models run at a few frames per second or less on this GPU, far below 25 Hz (the per-second rates are not independently verified).
 - **Where they do fit:** occupant monitoring that does not need 25 Hz, such as "phone in hand" or "child seat occupied", at a few fps
-  [verify]. Or offline: auto-labelling new clips, which is what we would do with DMD-style data next.
+  (not independently verified). Or offline: auto-labelling new clips, which is what we would do with DMD-style data next.
 
 ## Real infrared (MRL Eye)
 

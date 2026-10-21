@@ -1,8 +1,8 @@
 # THEORY — rules, theory, algorithms, keywords
 
 Ordered by project stage. Tags: **[SD-202]** = read from Euro NCAP SD-202 v1.2 (July 2026) text; **[DE v1.1]** = Driver Engagement
-protocol, only skimmed via snippets, verify before quoting; **[general]** = standard engineering/ML knowledge, not from a Euro NCAP
-document; **[verify]** = from memory, check the primary source before relying on it.
+protocol, only skimmed via search snippets, not read in full; **[general]** = standard engineering/ML knowledge, not from a Euro NCAP
+document.
 
 ---
 
@@ -18,8 +18,8 @@ document; **[verify]** = from memory, check the primary source before relying on
 - **[SD-202] Unresponsive driver:** eyes closed >= 13 s or gaze to lap >= 14 s.
 - **[SD-202] Intervention spot checks** at 30-80 km/h in CCRs / CMRs / CCRm; LKA e.g. 0.3 m/s lateral at 70 km/h.
 - **[DE v1.1]** 25 driver-monitoring points in scoring.
-- **[general/verify]** EU General Safety Regulation (EU) 2019/2144: DDAW (drowsiness and attention warning) and ADDW (advanced driver
-  distraction warning) become mandatory in phases 2024-2026; exact dates/scope: check the regulation text.
+- **[general]** EU General Safety Regulation (EU) 2019/2144: DDAW (drowsiness and attention warning) and ADDW (advanced driver
+  distraction warning) become mandatory in phases 2024-2026; the exact phase dates and scope are not independently verified here.
 - Keywords: Euro NCAP, SD-202, DMS, OMS, DDAW, ADDW, microsleep, LGA (long glance away), owl/lizard, occlusion, CCRs/CCRm/CMRs.
 
 ### 1.2 Signals from a camera
@@ -63,7 +63,7 @@ document; **[verify]** = from memory, check the primary source before relying on
 ## Stage 2 — Vehicle part in CARLA (add-on)
 
 ### 2.1 Euro NCAP link
-- **[SD-202]** intervention checks at 30-80 km/h against stationary targets (CCRs). **[DE v1.1, verify]** the idea of comparing the
+- **[SD-202]** intervention checks at 30-80 km/h against stationary targets (CCRs). **[DE v1.1, not independently verified]** the idea of comparing the
   forward-collision warning time when the driver is attentive vs inattentive (project shorthand: TFSS_att vs TFSS_inatt).
   The bench uses a **simplified** FCW, not a certified function.
 
