@@ -1,7 +1,22 @@
 # Experiments
 
 All results, including the ones that did not work. Numbers are small-sample: read the 95 % intervals, not the point values.
-Scoring rules: `METHOD.md` section 4.
+Scoring rules: [`METHOD.md`](METHOD.md) section 4.
+
+| # | Question | Answer in one line |
+|---|---|---|
+| E1 | Does the pipeline work where labels are exact? | Synthetic drivers: 15/18 warnings on time, 0 false alerts |
+| E2 | How does it do on real drivers? | DMD: 7/66 → 22/49, mostly by fixing the test setup, not the detector |
+| E3 | Which eye / gaze signal? | EAR beats the blink score on DMD (30/49); tuning one threshold does not transfer |
+| E4 | Do foundation models help? | DINOv2 / CLIP probes ≈ simple eyelid signals (~0.97); zero-shot CLIP is weak |
+| E5 | Do VLMs help? | Near chance on eyelids, seconds per frame: offline use only |
+| E6 | Does driver state matter for the car? | Earlier collision warning for an inattentive driver avoids crashes at 30-50 km/h |
+| E7 | Is it fast enough? | 35-58 fps on CPU; heavier models fall below 25 fps |
+| E8 | Does it work live on my own face? | 4/4 on time after fixing a look-down bug the live take found |
+| E9 | Does daylight training work on infrared? | No: 0.69-0.76; IR-trained 0.93-0.94 |
+| E10 | Real face drives the car; detector accuracy → crashes | MRM like UN R157; crash rate at 50 km/h 87 % → 44 % |
+| E11 | Night-time drivers? | Robust calibration: 7 → 16/27 hits |
+| E12 | Drowsy (not asleep): what should the car do? | Drowsiness level: 0 false levels on alert people, but catches only drowsiness with microsleeps (2/6) |
 
 ## E1. Synthetic drivers (Blender, 6 clips, exact labels)
 
@@ -263,7 +278,21 @@ closure labels, so it measures the detector, not the thresholds):
 | NITYMED hand-labelled P1042793 | level 2 at 54 s (label: 3 at 37 s) | level 3, 6-17 s late (first closures with head turned) |
 | Synthetic (6 clips) | 5/6 = label level within 0.1 s; sunglasses clip stays 0 (eyes unknown by design) | same |
 | Own phone take 5 | level 1 at 25.4 s = label level | same |
-| UTA-RLDD subject 08, "alert" video (9.75 min, natural, self-rated) | level 0 throughout, 0 microsleeps | level 0, peak PERCLOS 0.006 |
+
+**Real-life drowsiness (UTA-RLDD, fold 1 part 2: 6 people × 3 self-rated states, ~10 min each, 2.9 h, natural not acted).**
+Highest level per video:
+
+| | Alert (KSS 1-3) | Low vigilant (KSS 6-7) | Drowsy (KSS 8-9) |
+|---|---|---|---|
+| Blink score | 0 in 6/6 | 0 in 6/6 | **3 in 2/6**, 0 in 4/6 |
+| EAR | 0 in 6/6 | 0 in 5/6, 1 in 1/6 | **3 in 2/6**, 0 in 4/6 |
+
+- No false level on 57 min of alert video: the level is specific.
+- It misses quiet drowsiness: 4 of 6 people who rated themselves drowsy had no microsleep and PERCLOS ≤ 0.05, so the level never
+  moved. It detects repeated microsleeps, a late and clear sign, not early drowsiness (which is what UTA-RLDD was built for).
+- One of the two hits is weak: in that video the eyes were "unknown" 80 % of the time (far camera, light from above, eye sockets
+  in the brow shadow: the dark-lens check fired). That check was tuned only on synthetic sunglasses.
+- Licence not stated and 24 of 60 people did not allow their faces to be shown: only these numbers are published.
 
 **CARLA closed loop** (`scripts/live_demo.py <clip> --eye ear`, HMI shows the level):
 
@@ -285,16 +314,15 @@ It holds 78-80 km/h over 130 s; the escalation timeline is unchanged.
 **Regression.** SD-202 timers and the per-frame classifier are untouched; re-run: DMD lids-shut 22/49 (8 false alerts) blink,
 31/49 (17) EAR; synthetic 15/18, 0; night hand-labelled 10/27, 0 and 16/27, 1 (5 s calibration); take 5 4/4, 0. All identical to E1-E11.
 
-**Data for progressive drowsiness.** DMD and NITYMED are acted microsleeps over 2-3 min, so the 5-min window is never stressed.
-Free options checked: **UTA-RLDD** (60 people, ~10 min each in self-rated alert / low-vigilant / drowsy states, natural, RGB, Google
-Drive; licence not stated [verify]: never published here). Its Drive quota blocked the download after one video; the alert video is
-in the table, the drowsy pair is pending. **UL-DD** (19 drivers, 40 min continuous, KSS every 4 min, 2025) needs a request with an
-institutional e-mail and a data-use agreement. **DROZY** (IR, sleep deprivation, PSG) and **NTHU-DDD** (acted, licence form) are
-the alternatives. The thresholds above need one of these to be tuned honestly.
+**Data for progressive drowsiness.** DMD and NITYMED are acted microsleeps over 2-3 min. UTA-RLDD (above; Google Drive, Ghoddoosian
+et al. 2019) is natural but rated per video. **UL-DD** (19 drivers, 40 min continuous, KSS every 4 min, 2025) needs a request with an
+institutional e-mail and a data-use agreement; **DROZY** (IR, sleep deprivation, PSG) and **NTHU-DDD** (acted, licence form) are the
+alternatives. Earlier cues (blink rate, blink duration, eyelid speed) would need one of them, with thresholds chosen on one group
+of people and checked on another.
 
-**Limits.** Small and short clips; the levels are KSS-like, not validated against KSS; the head-away rule trades missed nodding-off
-closures for fewer false levels; the 60 km/h cap is our assumption; no lead car in the scene, so the earlier collision warning at
-level 2 is shown by the E6 sweep, not in this run.
+**Limits.** Short clips and 6 real-life people; the levels are KSS-like, not validated against KSS; the head-away rule trades
+missed nodding-off closures for fewer false levels; the 60 km/h cap is an assumption; no lead car in the scene, so the earlier
+collision warning at level 2 is shown by the E6 sweep, not in this run.
 
 ## Considered, not done
 

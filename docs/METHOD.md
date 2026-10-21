@@ -9,8 +9,9 @@ video (phone, DMD, Blender) -> variant (clean / IR / glare / dark / sunglasses /
   -> MediaPipe Face Landmarker: blink score, eye aspect ratio (EAR), head yaw/pitch, eye direction
   -> Classifier: per-driver calibration -> per frame: eyes closed? looking away?
   -> Monitor (Euro NCAP SD-202 timers) -> warnings: microsleep / sleep / long distraction
-  -> evaluate.py (vs labels) -> CSV + PDF report
-  -> escalation.py -> CARLA car: warn, slow down, minimal-risk stop     -> ROS 2 topic /dms/state
+  -> Drowsiness: level 0-3 over minutes (microsleeps, long blinks, PERCLOS)
+  -> evaluate.py / drowsy_eval.py (vs labels) -> CSV + PDF report
+  -> escalation.py -> CARLA car: warn, cap speed, slow down, minimal-risk stop     -> ROS 2 topic /dms/state
 ```
 
 ## 1. Rules (Euro NCAP SD-202 v1.2)
@@ -20,7 +21,8 @@ video (phone, DMD, Blender) -> variant (clean / IR / glare / dark / sunglasses /
 | Microsleep | eyes closed 1-2 s (maker declares) | 1.5 s |
 | Sleep | eyes closed 3 s | 3 s |
 | Long distraction | gaze off road 3-4 s (maker declares) | 3 s |
-| Unresponsive driver | eyes closed >= 13 s or away >= 14 s | escalation to a stop |
+| Unresponsive driver | eyes closed ≥ 6 s, or no reaction 3 s after a distraction warning; emergency function by 12-13 s | minimal-risk manoeuvre at 13 s closed / 14 s away |
+| Drowsiness | KSS > 7 at the latest (Euro NCAP); warning at KSS ≥ 8 (EU DDAW) | level 0-3, see section 3 |
 
 A warning counts as on time within **±0.2 s** of the required moment.
 
@@ -45,6 +47,12 @@ warning -> slowing to 60 km/h after 8 s -> minimal-risk manoeuvre at 13 / 14 s (
 to the rightmost lane if free, stop at its edge) -> stopped, no move-off. 2 s attentive before standstill = recovery. Look-down lid flicker
 (closed gaps <= 0.5 s) does not end a distraction episode.
 
+`src/drowsiness.py` adds a level over minutes: 1 (rest advice) at PERCLOS ≥ 0.08, one microsleep in 5 min or 6 long blinks
+(≥ 0.5 s) in a minute; 2 (urgent warning, collision warning at TTC 3.0 instead of 2.0 s) at PERCLOS ≥ 0.15 or 2 microsleeps;
+3 (speed capped at 60 km/h) at PERCLOS ≥ 0.30 or 3 microsleeps. Closures with the head away are not counted (looking down lowers
+the lids). PERCLOS is used once its 60 s window is full. Thresholds are assumptions (E12). `scripts/drowsy_eval.py --labels` runs
+the same code on the labels, so detected and "true" levels are compared with identical thresholds.
+
 ## 4. Scoring (`src/evaluate.py`)
 
 - Each labelled event long enough for a warning expects one: **hit** (within ±0.2 s), **early**, **late**, or **miss**.
@@ -59,6 +67,9 @@ to the rightmost lane if free, stop at its edge) -> stopped, no move-off. 2 s at
 | Source | What | Notes |
 |---|---|---|
 | DMD (Vicomtech) | 13 face videos, 6 drivers, per-frame eye-state and gaze-zone labels | CC BY-NC-ND, academic use; kept local, never uploaded |
+| NITYMED (Petrellis et al.) | 19 night-time videos of drivers in moving cars; 2 hand-labelled at 0.5 s steps | CC BY 4.0; shown with citation |
+| UTA-RLDD (Ghoddoosian et al.) | 18 videos (6 people × alert / low vigilant / drowsy, self-rated, ~10 min) | licence not stated; numbers only |
+| MRL Eye | 16,920 sampled infrared eye crops, 37 people | eye-state classifiers only (E9) |
 | Blender + MPFB2 | 6 synthetic driver clips with exact labels (`details/SYNTHETIC.md`) | covers sunglasses / mask safely |
 | Own phone clips | voice-guided takes, hand-labelled (E8); protocol in `details/RECORDING.md` | never while driving |
 | CARLA 0.9.16 | road scenes for the vehicle side | no in-cabin camera in CARLA |

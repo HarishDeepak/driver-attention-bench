@@ -37,7 +37,7 @@ CPU time of the landmarker call per frame; it was measured while the MediaPipe b
 ## Caveats (read these before quoting numbers)
 
 - **Frame-level, not event-level.** We score single frames. We do not measure alert timing, PERCLOS or the SD-202 rules. The
-  event-level results are in `README.md` and `docs/EXPERIMENTS.md`.
+  event-level results are in `docs/EXPERIMENTS.md`.
 - **Easy frames only.** Blink/transition frames are dropped, so the task is easier than real drowsiness detection.
 - **Few subjects.** Six people and 870 closed frames. A difference of 0.01 in balanced accuracy means nothing here.
 - **Thresholds are learned on training subjects only.** For (a) and (b) the cut-off is the one that maximises balanced accuracy on the
