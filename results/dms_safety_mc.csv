@@ -7,19 +7,27 @@ no DMS (fixed warning),0.0,70,0.9909,54.73
 no DMS (fixed warning),0.0,80,0.9994,65.42
 no DMS (fixed warning),0.0,90,1.0,75.85
 no DMS (fixed warning),0.0,100,1.0,86.08
-"DMS, measured on DMD (p = 0.61)",0.61,30,0.2806,6.4
-"DMS, measured on DMD (p = 0.61)",0.61,40,0.3621,10.49
-"DMS, measured on DMD (p = 0.61)",0.61,50,0.4436,15.78
-"DMS, measured on DMD (p = 0.61)",0.61,60,0.5344,22.43
-"DMS, measured on DMD (p = 0.61)",0.61,70,0.6092,29.75
-"DMS, measured on DMD (p = 0.61)",0.61,80,0.6822,37.82
-"DMS, measured on DMD (p = 0.61)",0.61,90,0.778,47.82
-"DMS, measured on DMD (p = 0.61)",0.61,100,0.8718,59.42
-ideal DMS (p = 1.0),1.0,30,0.0734,1.5
-ideal DMS (p = 1.0),1.0,40,0.1102,2.79
-ideal DMS (p = 1.0),1.0,50,0.167,4.9
-ideal DMS (p = 1.0),1.0,60,0.2502,8.21
-ideal DMS (p = 1.0),1.0,70,0.3491,13.06
-ideal DMS (p = 1.0),1.0,80,0.4916,20.42
-ideal DMS (p = 1.0),1.0,90,0.6397,30.05
-ideal DMS (p = 1.0),1.0,100,0.7877,41.49
+distraction detector as measured (p = 0.25),0.25,30,0.4721,10.93
+distraction detector as measured (p = 0.25),0.25,40,0.5878,17.52
+distraction detector as measured (p = 0.25),0.25,50,0.7008,25.71
+distraction detector as measured (p = 0.25),0.25,60,0.7829,35.04
+distraction detector as measured (p = 0.25),0.25,70,0.8364,44.66
+distraction detector as measured (p = 0.25),0.25,80,0.8702,54.13
+distraction detector as measured (p = 0.25),0.25,90,0.9096,64.47
+distraction detector as measured (p = 0.25),0.25,100,0.9467,75.31
+eye-closure detector as measured (p = 0.61),0.61,30,0.2788,6.35
+eye-closure detector as measured (p = 0.61),0.61,40,0.3602,10.55
+eye-closure detector as measured (p = 0.61),0.61,50,0.4422,15.73
+eye-closure detector as measured (p = 0.61),0.61,60,0.5222,22.0
+eye-closure detector as measured (p = 0.61),0.61,70,0.5981,29.12
+eye-closure detector as measured (p = 0.61),0.61,80,0.6864,38.04
+eye-closure detector as measured (p = 0.61),0.61,90,0.7818,48.08
+eye-closure detector as measured (p = 0.61),0.61,100,0.8734,59.12
+ideal DMS (p = 1.0),1.0,30,0.0736,1.54
+ideal DMS (p = 1.0),1.0,40,0.1118,2.79
+ideal DMS (p = 1.0),1.0,50,0.1688,4.96
+ideal DMS (p = 1.0),1.0,60,0.2457,8.2
+ideal DMS (p = 1.0),1.0,70,0.3589,13.3
+ideal DMS (p = 1.0),1.0,80,0.4972,20.49
+ideal DMS (p = 1.0),1.0,90,0.6366,29.49
+ideal DMS (p = 1.0),1.0,100,0.7856,41.54

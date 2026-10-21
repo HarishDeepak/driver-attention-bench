@@ -13,9 +13,11 @@ ROOT = Path(__file__).resolve().parent.parent
 THR_FIXED, THR_GATED, A_BRAKE = 2.0, 3.0, 8.0  # as carla_fcw.py
 RT_MEDIAN, RT_SIGMA = 1.6, 0.3  # distracted driver's reaction after the warning: lognormal, median 1.6 s (assumption, not measured)
 N = 20000
-# p = share of inattention episodes the DMS catches. 0.61: DMD event-level hit rate (EAR arm, lids-shut labels, E3) as a conservative
-# proxy; 1.0: ideal (the live take caught 4/4, one take only)
-CASES = {"no DMS (fixed warning)": 0.0, "DMS, measured on DMD (p = 0.61)": 0.61, "ideal DMS (p = 1.0)": 1.0}
+# p = share of inattention episodes the DMS catches on time (DMD event-level hit rates, E3). This scenario is a distracted driver,
+# so the matching measured rate is the distraction one (best arm 3/12 = 0.25); 0.61 is the eye-closure rate (EAR, 30/49), i.e. the
+# same kinematics for an eyes-closed driver; 1.0: ideal
+CASES = {"no DMS (fixed warning)": 0.0, "distraction detector as measured (p = 0.25)": 0.25,
+         "eye-closure detector as measured (p = 0.61)": 0.61, "ideal DMS (p = 1.0)": 1.0}
 
 
 def impact_kmh(v_kmh, thr, rt):
@@ -51,7 +53,7 @@ def main():
         r = [x for x in rows if x[0] == name]
         a.plot([x[2] for x in r], [x[3] for x in r], marker="o", label=name)
         b.plot([x[2] for x in r], [x[4] for x in r], marker="o", label=name)
-    a.set(xlabel="speed (km/h)", ylabel="crash probability", ylim=(0, 1.02), title="Distracted driver, stopped car ahead")
+    a.set(xlabel="speed (km/h)", ylabel="crash probability", ylim=(0, 1.02), title="Inattentive driver, stopped car ahead")
     b.set(xlabel="speed (km/h)", ylabel="mean impact speed (km/h)", title="Mean impact speed (0 = stopped in time)")
     a.legend(fontsize=7)
     for ax in (a, b):

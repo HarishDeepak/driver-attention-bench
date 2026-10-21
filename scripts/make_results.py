@@ -18,7 +18,8 @@ from evaluate import read, wilson  # noqa: E402
 OUT, RES = ROOT / "out", ROOT / "results"
 COPY = {"carla_fcw.csv": "carla_fcw.csv", "carla_fcw.png": "carla_fcw.png", "synthetic/summary.csv": "synthetic_summary.csv",
         "synthetic/report.pdf": "synthetic_report.pdf", "dmd/summary.csv": "dmd_summary.csv", "dmd/arms.csv": "dmd_arms.csv",
-        "fm/eye_probe.csv": "foundation_eye_probe.csv", "fm/ir_eye_probe.csv": "infrared_eye_probe.csv", "vlm/summary.csv": "vlm_summary.csv"}
+        "fm/eye_probe.csv": "foundation_eye_probe.csv", "fm/ir_eye_probe.csv": "infrared_eye_probe.csv", "vlm/summary.csv": "vlm_summary.csv",
+        "fm/mrl_samples.png": "infrared_eye_samples.png"}  # MRL Eye crops: public dataset, shown with citation (Fusek 2018)
 # DMD measurement steps, default arm: runs in out/dmd_baseline, out/dmd_scope, out/dmd; step 4 = scripts/replay.py on close-only labels
 DMD_STEPS = [("first run", 7, 66, 107), ("+ scoring scope", 7, 62, 18.9), ("+ 20 s calibration", 10, 58, 9.7), ("+ lids-shut labels", 22, 49, 19.4)]
 
@@ -240,7 +241,7 @@ def main():
         ir_chart(OUT / "fm/ir_eye_probe.csv", RES / "infrared_eye_state.png")
     live = ROOT / "data/clips/clip05_live.mp4"  # own face, phone camera, voice-guided take, hand-labelled truth (publishable, unlike DMD)
     if live.exists():
-        live_gif(live, OUT / "live_runs5/camera__clean_frames.csv", OUT / "live_runs5/labels_hand.csv", RES / "demo_live_phone.gif", 21, 51)
+        live_gif(live, OUT / "live_runs5/camera__clean_frames.csv", OUT / "live_runs5/labels_hand.csv", RES / "demo_live_phone.gif", 21, 51, fps=4, width=440)  # small: loaded first on the README
     clip = "synth02_sleep"
     n = demo_gif(ROOT / "data/synthetic" / f"{clip}.mp4", OUT / "synthetic/runs" / f"{clip}__clean_frames.csv",
                  OUT / "synthetic/runs" / f"{clip}__clean_warnings.csv", RES / "demo_synthetic_sleep.gif")

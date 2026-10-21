@@ -6,17 +6,17 @@ Scoring rules: [`METHOD.md`](METHOD.md) section 4.
 | # | Question | Answer in one line |
 |---|---|---|
 | E1 | Does the pipeline work where labels are exact? | Synthetic drivers: 15/18 warnings on time, 0 false alerts |
-| E2 | How does it do on real drivers? | DMD: 7/66 → 22/49, mostly by fixing the test setup, not the detector |
-| E3 | Which eye / gaze signal? | EAR beats the blink score on DMD (30/49); tuning one threshold does not transfer |
+| E2 | How does it do on real drivers? | DMD: 7/66 → 22/49 (0.31-0.59) at 19 false alerts/h, mostly by fixing the test setup; still far from production |
+| E3 | Which eye / gaze signal? | EAR beats the blink score on DMD (30-31/49, more false alerts); gaze only 2-3/12; tuning one threshold does not transfer |
 | E4 | Do foundation models help? | DINOv2 / CLIP probes ≈ simple eyelid signals (~0.97); zero-shot CLIP is weak |
 | E5 | Do VLMs help? | Near chance on eyelids, seconds per frame: offline use only |
 | E6 | Does driver state matter for the car? | Earlier collision warning for an inattentive driver avoids crashes at 30-50 km/h |
 | E7 | Is it fast enough? | 35-58 fps on CPU; heavier models fall below 25 fps |
 | E8 | Does it work live on my own face? | 4/4 on time after fixing a look-down bug the live take found |
 | E9 | Does daylight training work on infrared? | No: 0.69-0.76; IR-trained 0.93-0.94 |
-| E10 | Real face drives the car; detector accuracy → crashes | MRM like UN R157; crash rate at 50 km/h 87 % → 44 % |
-| E11 | Night-time drivers? | Robust calibration: 7 → 16/27 hits |
-| E12 | Drowsy (not asleep): what should the car do? | Drowsiness level: 0 false levels on alert people, but catches only drowsiness with microsleeps (2/6) |
+| E10 | Real face drives the car; detector accuracy → crashes | MRM modelled on UN R157; crash rate at 50 km/h 87 % → 70 % (distraction) / 44 % (eye closure) |
+| E11 | Night-time drivers? | Robust calibration: 7 → 10/27 hits (blink score); 16/27 with EAR, at more false alerts on DMD |
+| E12 | Drowsy (not asleep): what should the car do? | Drowsiness level: 0/6 alert videos with a false level, but only 2/6 drowsy ones caught (one doubtful) |
 
 ## E1. Synthetic drivers (Blender, 6 clips, exact labels)
 
@@ -156,6 +156,10 @@ images (8,492 closed). MediaPipe blink/EAR cannot run on eye crops (they need a 
 CLIP IR probe by condition: bad lighting 0.93 vs good 0.94; glasses 0.88 vs none 0.96; big reflections 0.86 vs none 0.95.
 GPU forward pass: DINOv2-small 1.3 ms, CLIP ViT-B/32 0.7 ms per eye image.
 
+![Infrared eye samples by condition](../results/infrared_eye_samples.png)
+*MRL Eye samples (Fusek, ISVC 2018; publicly available, no licence stated, cropped eyes shown with citation, removed on request):
+open vs closed in good light, bad light, with glasses and with big reflections.*
+
 ![Infrared eye-state results](../results/infrared_eye_state.png)
 
 **Reading:** a model trained on daylight RGB drops to 0.69-0.76 on infrared: the day-to-night domain gap is real. Trained on IR it
@@ -172,7 +176,9 @@ Two fixes made on the way: video frames (30 fps) now all feed the DMS while the 
 tick per frame ran the car 1.5x slow); the Traffic Manager is pinned to the start lane (`tm.set_path`), because a replay showed the
 minimal-risk stop ending at a highway-exit gore instead of in lane. The scene now loads props, street lights, buildings and foliage on top of the ground layer (fits the 6 GB GPU, ~2.7 GB) and adds six Traffic-Manager cars in the neighbouring lanes, so the slow-down and the stop in lane are visible against traffic.
 
-**Minimal-risk manoeuvre, done like the regulation and CARLA's own planner.** UN R157 (automated lane keeping, https://unece.org/sites/default/files/2023-12/R157e.pdf) requires the MRM to
+**Minimal-risk manoeuvre, modelled on UN R157 and done with CARLA's own planner.** R157 governs automated lane keeping (ALKS), not a
+stop triggered by a driver monitor in a manually driven car, so this borrows its MRM profile rather than claiming compliance.
+R157 (https://unece.org/sites/default/files/2023-12/R157e.pdf) requires the MRM to
 slow the car "inside the lane" at ≤ 4 m/s², hazard lights from its start, standstill, and no move-off without manual input. On top,
 as some production systems do, the car now moves to the slower lane first when that is safe: at the MRM start CARLA's reference
 `BasicAgent` (LocalPlanner + PID) takes over from the Traffic Manager; each tick it checks, exactly like CARLA's `BehaviorAgent`,
@@ -183,19 +189,21 @@ hazards and brake lights on, a following car stops behind it. If the lane is occ
 Bug fixed on the way: the escalation ramp fed the measured speed back every tick, so controller overshoot ratcheted the target
 down (~5 m/s² instead of 2); it is now a time-based ramp from the speed at MRM start (self-check added), measured 2.0 m/s² in CARLA.
 
-**Monte Carlo** (`scripts/dms_safety_mc.py`): distracted driver, stopped car ahead, kinematics and thresholds as the CARLA sweep
+**Monte Carlo** (`scripts/dms_safety_mc.py`): inattentive driver, stopped car ahead, kinematics and thresholds as the CARLA sweep
 (warning TTC 2.0 s, or 3.0 s when the DMS flags inattention; braking 8 m/s²), reaction time lognormal with median 1.6 s (assumption),
-20,000 drivers per point. The DMS catches the inattention with probability p.
+20,000 drivers per point. The DMS catches the inattention with probability p, taken from the DMD event-level hit rates (E3):
+distraction 3/12 = 0.25 (best gaze arm) for a driver looking away, eye closure 30/49 = 0.61 (EAR) for a driver whose eyes close.
 
-| Speed | No DMS: crash / mean impact | DMS, p = 0.61 (DMD, EAR arm): crash / impact | Ideal DMS, p = 1: crash / impact |
-|---|---|---|---|
-| 30 km/h | 60 % / 14 km/h | 28 % / 6 km/h | 7 % / 2 km/h |
-| 50 km/h | 87 % / 33 km/h | 44 % / 16 km/h | 17 % / 5 km/h |
-| 80 km/h | 100 % / 65 km/h | 68 % / 38 km/h | 49 % / 20 km/h |
+| Speed | No DMS | Distraction detector, p = 0.25 | Eye-closure detector, p = 0.61 | Ideal, p = 1 |
+|---|---|---|---|---|
+| 30 km/h | 60 % / 14 km/h | 47 % / 11 km/h | 28 % / 6 km/h | 7 % / 2 km/h |
+| 50 km/h | 87 % / 33 km/h | 70 % / 26 km/h | 44 % / 16 km/h | 17 % / 5 km/h |
+| 80 km/h | 100 % / 65 km/h | 87 % / 54 km/h | 69 % / 38 km/h | 50 % / 21 km/h |
 
-The kinematic model reproduces the CARLA sweep case (30 km/h, fixed warning: 14.2 km/h impact). p = 0.61 is a conservative proxy
-(event-level hit rate within ±0.2 s on DMD); a distraction caught 0.5 s late would still move the warning earlier. The result is a
-model, but it links the perception metric to a vehicle-level outcome, which is what a requirement for DMS accuracy needs.
+Cells: crash probability / mean impact speed. The kinematic model reproduces the CARLA sweep case (30 km/h, fixed warning: 14.2 km/h
+impact). An earlier version used 0.61 for the distracted driver and called it conservative; it was the wrong event (a review caught
+it). The weak gaze detector (3/12) is the bottleneck for distraction. The result is a model, but it links a perception metric to a
+vehicle-level outcome, which is what a requirement for DMS accuracy needs.
 
 ![DMS safety Monte Carlo](../results/dms_safety_mc.png)
 
@@ -244,7 +252,7 @@ do more than beep. What do regulations and car makers actually do? Sources check
   warning; the Emergency Function then starts by 12-13 s. Our existing MRM at 13 s closed / 14 s away matches that timeline.
 - **EU DDAW** (Reg. 2021/1341): warning at KSS ≥ 8; **ADDW** (Reg. 2023/2590): distraction warning. Warnings only.
 - Production: VW Emergency Assist, Volvo EX90 and Ford BlueCruise slow / stop the car for an **unresponsive** driver; Mercedes and
-  BMW details only from secondary sources [verify]. No production system found that slows a merely drowsy driver [verify].
+  BMW details only from secondary sources. No production system that slows a merely drowsy driver was found in the sources checked.
 
 **Design** (`src/drowsiness.py`, beside the unchanged SD-202 `Monitor`). A KSS-like level from three cues, each over a window:
 microsleep warnings in the last 5 min, long blinks (closed ≥ 0.5 s) in the last minute, PERCLOS over 60 s (used only once its
